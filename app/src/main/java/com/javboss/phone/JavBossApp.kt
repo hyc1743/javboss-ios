@@ -11,6 +11,7 @@ import com.javboss.phone.data.SessionManager
 import com.javboss.phone.data.VideoRepository
 import com.javboss.phone.data.api.ApiClient
 import com.javboss.phone.data.api.SessionCookieJar
+import com.javboss.phone.data.localproxy.AuthProxy
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -23,6 +24,8 @@ class AppContainer(context: Application) {
     val authRepository = AuthRepository(session, apiClient)
     val videoRepository = VideoRepository(apiClient)
     val favoriteRepository = FavoriteRepository(apiClient)
+    // 本地鉴权代理：libVLC 播放时经它转发请求并附加会话 Cookie（懒启动）
+    val authProxy = AuthProxy(apiClient.okHttpClient, apiClient::absoluteUrl)
 }
 
 class JavBossApp : Application(), SingletonImageLoader.Factory {

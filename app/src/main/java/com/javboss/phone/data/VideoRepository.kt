@@ -27,11 +27,17 @@ class VideoRepository(private val apiClient: ApiClient) {
     suspend fun getStreams(id: Long): StreamsResponse =
         apiClient.api().getStreams(id)
 
-    /** 播放源地址转绝对 URL，按服务端 preferred 排序（direct 优先时直排在最前） */
+    /**
+     * 播放源地址转绝对 URL。direct 永远排最前（免转码、原生 Range 拖动），
+     * 服务端按浏览器标准未列出 direct 源时（mkv/wmv/h265 等）按固定格式自拼；
+     * HLS 排最后兜底（依赖服务端 ffmpeg）。
+     */
     suspend fun resolvePlayUrls(id: Long): List<String> {
         val streams = getStreams(id)
-        val sorted = streams.sources.sortedByDescending { it.kind == streams.preferredKind }
-        return sorted.map { apiClient.absoluteUrl(it.src) }
+        val direct = streams.sources.firstOrNull { it.kind == "direct" }?.src
+            ?: "videos/$id/stream"
+        val hls = streams.sources.filter { it.kind == "hls" }.map { it.src }
+        return (listOf(direct) + hls).map { apiClient.absoluteUrl(it) }
     }
 
     suspend fun reportPlay(id: Long) {

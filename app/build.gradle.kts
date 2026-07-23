@@ -46,6 +46,16 @@ android {
         }
     }
 
+    // libvlc 每个 ABI 约 30MB 原生库，release 按 ABI 拆包控制单包体积
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -90,4 +100,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.libvlc.all)
+    implementation(libs.nanohttpd)
 }

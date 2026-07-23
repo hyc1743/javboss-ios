@@ -8,7 +8,8 @@
 ## 功能
 
 - **登录**：服务器地址 + 密码，会话 Cookie 本地持久化（服务端会话 14 天有效）；
-  地址可省略协议头（自动补 `http://`）
+  地址可省略协议头（自动补 `http://`）；底部导航"退出"可主动登出
+  （通知服务端销毁会话并清空本地 Cookie）
 - **底部三 tab**
   - **视频**：原始视频列表，16:9 缩略图两列瀑布流，无限加载、搜索、排序、下拉刷新
   - **作品**：JAV 作品库，四个卡片墙视角（作品/女优/片商/系列），两列瀑布流、
@@ -18,8 +19,13 @@
 - **详情页**：封面、番号、发行日期、时长、片商、系列、演员、标签、视频截图；
   片商/系列/演员/标签均可点击跳转到对应过滤作品列表；外部链接直达 JavDB；
   操作栏含播放、收藏（勾选收藏夹 + 新建收藏夹）、编辑（标题/发行日期/时长/片商/系列/演员/标签，支持新建标签）
-- **播放**：Media3 ExoPlayer，优先服务端 preferred 源（direct 直流，支持
-  Range 拖动），播放失败自动 fallback 到 HLS 转码流；进入自动横屏 + 沉浸模式
+- **播放**：双引擎，进入自动横屏 + 沉浸模式
+  - 首选 Media3 ExoPlayer：direct 直流优先（支持 Range 拖动；服务端按浏览器
+    标准未列出 direct 源时客户端自拼 `/videos/{id}/stream` 补上），失败自动
+    fallback 到 HLS 转码流
+  - ExoPlayer 全部源失败自动切换 libVLC（内置完整 ffmpeg，wmv/rmvb/flv/avi
+    等冷门格式软解兜底），从失败进度续播；libVLC 无法注入 Cookie，
+    播放请求经 App 内本地代理（127.0.0.1）转发并附加会话 Cookie
 
 ## 使用
 
@@ -71,7 +77,9 @@ gradlew.bat assembleDebug
 gradlew.bat assembleRelease
 ```
 
-产物在 `app/build/outputs/apk/`。applicationId 为 `com.javboss.phone`，
+产物在 `app/build/outputs/apk/`。release 按 ABI 分包
+（arm64-v8a / armeabi-v7a / x86_64 + universal；libvlc 原生库每 ABI 约 30MB，
+按设备安装对应包即可）。applicationId 为 `com.javboss.phone`，
 可与 TV 版（`com.javboss.tv`）共存安装。
 
 ## License

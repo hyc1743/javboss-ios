@@ -8,6 +8,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.javboss.phone.data.AuthRepository
 import com.javboss.phone.data.FavoriteRepository
 import com.javboss.phone.data.SessionManager
+import com.javboss.phone.data.SettingsManager
 import com.javboss.phone.data.VideoRepository
 import com.javboss.phone.data.api.ApiClient
 import com.javboss.phone.data.api.SessionCookieJar
@@ -19,6 +20,7 @@ import kotlinx.coroutines.runBlocking
  */
 class AppContainer(context: Application) {
     val session = SessionManager(context)
+    val settings = SettingsManager(context)
     val cookieJar = SessionCookieJar(session)
     val apiClient = ApiClient(session, cookieJar)
     val authRepository = AuthRepository(session, apiClient)
@@ -36,9 +38,10 @@ class JavBossApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // 恢复上次会话（服务器地址 + Cookie），字节级数据，阻塞读可接受
+        // 恢复上次会话（服务器地址 + Cookie）和设置，字节级数据，阻塞读可接受
         runBlocking {
             container.session.restore()
+            container.settings.restore()
             container.cookieJar.restoreFromSession()
         }
     }

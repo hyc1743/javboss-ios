@@ -66,3 +66,19 @@ libvlc-all 每个 ABI 约 30MB 原生库。release 构建启用 ABI 分包（arm
 2. 服务端有 ffmpeg 时行为不回退：常见格式仍 direct 优先。
 3. 播放中切引擎时进度不丢失（从 ExoPlayer 失败位置续播）。
 4. `gradlew.bat assembleDebug` 通过；模拟器（AVD → 10.0.2.2:8655 访问宿主机服务）实测通过。
+
+## v2 追加（已实现）：统一播放页 + 用户可选引擎
+
+- 播放页重构为**单一页面 + 单一自绘控制条**，`PlayerEngine` 接口下挂
+  `ExoPlayerEngine` / `VlcPlayerEngine` 两个实现，引擎只负责解码渲染
+  （`PlayerView(useController=false)` / `VLCVideoLayout`）。
+- 新增设置 tab（底部导航第四个），播放引擎偏好三选一：
+  自动（ExoPlayer 优先、libVLC 兜底）/ 仅 ExoPlayer / 仅 libVLC，
+  `SettingsManager`（DataStore `settings`）持久化，进播放页时读取。
+- 关键实现约束（实测踩坑）：
+  - `AndroidView` 的 factory 在同一组合位置只执行一次，引擎切换必须用
+    `key(activeEngine)` 强制重建，否则 VLC 视图从未挂载（黑屏无声）。
+  - libVLC 起播必须等渲染表面就绪（surfaceCreated 后再 play），
+    否则 vout 创建失败、全场只有音频。
+- 模拟器三模式实测通过：AUTO 下 mp4 走 ExoPlayer、wmv 自动切 libVLC；
+  仅 libVLC 下 mp4 可播；仅 ExoPlayer 下 wmv 明确报错（不兜底）。

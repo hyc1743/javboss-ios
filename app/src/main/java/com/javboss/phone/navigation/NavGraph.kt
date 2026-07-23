@@ -1,17 +1,21 @@
 package com.javboss.phone.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.javboss.phone.JavBossApp
 import com.javboss.phone.ui.detail.DetailScreen
 import com.javboss.phone.ui.favorites.FavGroupScreen
 import com.javboss.phone.ui.javlist.JavListScreen
 import com.javboss.phone.ui.login.LoginScreen
 import com.javboss.phone.ui.main.MainScreen
 import com.javboss.phone.ui.player.PlayerScreen
+import kotlinx.coroutines.launch
 
 object Routes {
     const val LOGIN = "login"
@@ -52,6 +56,16 @@ fun JavBossNavGraph(startWithSession: Boolean) {
         }
     }
 
+    // 主动登出：通知服务端销毁会话、清空本地 Cookie 后回登录页
+    val app = LocalContext.current.applicationContext as JavBossApp
+    val scope = rememberCoroutineScope()
+    val doLogout: () -> Unit = {
+        scope.launch {
+            app.container.authRepository.logout()
+            goLogin()
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = if (startWithSession) Routes.MAIN else Routes.LOGIN,
@@ -73,6 +87,7 @@ fun JavBossNavGraph(startWithSession: Boolean) {
                 },
                 onFavGroupClick = { id, name -> navController.navigate(Routes.favGroup(id, name)) },
                 onSessionExpired = goLogin,
+                onLogout = doLogout,
             )
         }
         composable(

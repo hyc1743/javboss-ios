@@ -6,10 +6,10 @@ import okhttp3.CookieJar
 import okhttp3.HttpUrl
 
 /**
- * 极简 CookieJar：内存保存服务端 Set-Cookie，并把整个 Cookie 头持久化到 DataStore。
+ * 极简 CookieJar：内存保存当前 JavBoss 服务端的会话 Cookie，并把 Cookie 头持久化到 DataStore。
  *
- * 服务端只有会话 Cookie（javboss_session*），单用户场景下不需要按 domain/path 精细管理。
- * OkHttp、Coil（封面图）、ExoPlayer（视频流）共用同一份 Cookie。
+ * 客户端只需要服务端会话 Cookie，但必须严格限制为当前配置的同源请求：Coil 和
+ * libVLC 代理共用这个客户端，绝不能把会话带到外部封面、跳转地址或其他服务器。
  */
 class SessionCookieJar(private val session: SessionManager) : CookieJar {
 
@@ -29,8 +29,12 @@ class SessionCookieJar(private val session: SessionManager) : CookieJar {
 
     fun clear() = store.clear()
 
+    private fun isServerOrigin(url: HttpUrl): Boolean {
+        return ServerOrigin.matches(session.serverUrl, url.toString())
+    }
+
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        if (cookies.isEmpty()) return
+        if (cookies.isEmpty() || !isServerOrigin(url)) return
         var changed = false
         for (cookie in cookies) {
             if (cookie.expiresAt < System.currentTimeMillis()) {
@@ -47,12 +51,13 @@ class SessionCookieJar(private val session: SessionManager) : CookieJar {
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        if (store.isEmpty()) return emptyList()
+        if (store.isEmpty() || !isServerOrigin(url)) return emptyList()
         return store.map { (name, value) ->
             Cookie.Builder()
                 .name(name)
                 .value(value)
-                .domain(url.host)
+                .hostOnlyDomain(url.host)
+                .path("/")
                 .build()
         }
     }

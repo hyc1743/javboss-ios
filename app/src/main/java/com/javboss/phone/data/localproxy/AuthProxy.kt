@@ -4,14 +4,15 @@ import fi.iki.elonen.NanoHTTPD
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
+import java.util.UUID
 
 /**
  * 本地鉴权代理：libVLC 的 HTTP 模块无法注入自定义 Cookie 头，
- * 所以让 libVLC 播放 http://127.0.0.1:{port}/... 地址，
+ * 所以让 libVLC 播放含随机能力路径的 http://127.0.0.1:{port}/{token}/... 地址，
  * 由本代理用共享 OkHttpClient（带会话 CookieJar）转发到 JavBoss 服务端。
  *
  * 两种地址形式：
- * - `/?url={urlencoded 上游绝对地址}`：proxyUrl() 生成的显式形式
+ * - `/{token}/?url={urlencoded 上游绝对地址}`：proxyUrl() 生成的显式形式
  * - 任意路径（如 /videos/2/stream.m3u8/0.ts）：HLS 分片相对地址被 VLC
  *   按代理 base 解析后自然回落到代理，按服务端相对路径处理
  *
@@ -20,15 +21,17 @@ import java.net.URLEncoder
 class AuthProxy(
     private val okHttpClient: OkHttpClient,
     private val absoluteUrl: (String) -> String,
+    private val isServerUrl: (String) -> Boolean,
 ) {
 
     @Volatile
     private var server: ProxyServer? = null
+    private val capabilityPath = "/${UUID.randomUUID()}"
 
     val baseUrl: String
         get() {
             start()
-            return "http://127.0.0.1:${server!!.listeningPort}"
+            return "http://127.0.0.1:${server!!.listeningPort}$capabilityPath"
         }
 
     @Synchronized
@@ -38,16 +41,31 @@ class AuthProxy(
         }
     }
 
-    fun proxyUrl(upstreamAbsoluteUrl: String): String =
-        "$baseUrl/?url=" + URLEncoder.encode(upstreamAbsoluteUrl, "UTF-8")
+    fun proxyUrl(upstreamAbsoluteUrl: String): String {
+        require(isServerUrl(upstreamAbsoluteUrl)) { "代理只允许访问当前服务器" }
+        return "$baseUrl/?url=" + URLEncoder.encode(upstreamAbsoluteUrl, "UTF-8")
+    }
 
     private inner class ProxyServer : NanoHTTPD("127.0.0.1", 0) {
 
         override fun serve(session: IHTTPSession): Response {
-            val explicit = session.parms["url"]
-            val upstream = explicit ?: run {
-                val query = session.queryParameterString
-                absoluteUrl(session.uri + (query?.let { "?$it" } ?: ""))
+            if (session.uri != capabilityPath && !session.uri.startsWith("$capabilityPath/")) {
+                return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "proxy token required")
+            }
+            val upstream = try {
+                val explicit = session.parameters["url"]?.firstOrNull()
+                explicit ?: run {
+                    val query = session.queryParameterString
+                    val relativePath = session.uri.removePrefix(capabilityPath)
+                    absoluteUrl(relativePath + (query?.let { "?$it" } ?: ""))
+                }
+            } catch (_: IllegalArgumentException) {
+                return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "proxy upstream is not allowed")
+            }
+            if (!isServerUrl(upstream)) {
+                return newFixedLengthResponse(
+                    Response.Status.FORBIDDEN, "text/plain", "proxy upstream is not allowed",
+                )
             }
 
             val request = Request.Builder()

@@ -48,11 +48,12 @@ VLC 引擎：同样的 urls（经本地代理），seek 续播，逐个尝试
 libVLC 的 HTTP 模块无法注入自定义 Cookie 头（已读 VLC 3.x 源码确认：仅支持改 User-Agent/Referer，cookie jar 不暴露公开 API）。因此：
 
 - App 内启动一个微型本地 HTTP 代理（`org.nanohttpd:nanohttpd`），绑定 `127.0.0.1:随机端口`。
-- libVLC 播放地址为 `http://127.0.0.1:{port}/?url={urlencoded 上游绝对地址}`。
+- libVLC 播放地址含随机能力路径：`http://127.0.0.1:{port}/{token}/?url={urlencoded 上游绝对地址}`。
 - 代理解析出上游地址，用共享 OkHttpClient 转发（自动带 CookieJar 中的会话 Cookie），流式回传（不缓冲整个 body），透传 `Range`/`Content-Range`/`Content-Length`/`Content-Type`/`Accept-Ranges`。
 - HLS 的 m3u8 与分片走同一代理（m3u8 内分片为相对地址，VLC 会基于代理 URL 解析，自然回到代理）。
 - 上游请求强制 `Accept-Encoding: identity`，避免 gzip 导致 Content-Length 不一致。
-- 生命周期：随 AppContainer 创建（懒启动），进程结束自然回收；仅监听 loopback，无安全风险。
+- 生命周期：随 AppContainer 创建（懒启动），进程结束自然回收；仅监听 loopback，
+  且随机能力路径、上游同源校验和 CookieJar 同源校验三层限制，避免其他本机应用借用会话。
 
 ### 5. APK 体积
 

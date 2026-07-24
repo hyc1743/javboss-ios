@@ -211,10 +211,15 @@ class ApiClient(
         return api
     }
 
-    /** 图片绝对地址：服务端返回的 src 多为相对路径，统一在这里拼 base */
+    /** 当前服务端的同源校验，流媒体和带鉴权的图片都只能访问此 origin。 */
+    fun isServerUrl(url: String): Boolean = ServerOrigin.matches(session.serverUrl, url)
+
+    /** 图片/流绝对地址：服务端返回的 src 多为相对路径；绝对地址必须保持同源。 */
     fun absoluteUrl(pathOrUrl: String): String {
-        if (pathOrUrl.startsWith("http")) return pathOrUrl
-        return session.serverUrl.trimEnd('/') + "/" + pathOrUrl.trimStart('/')
+        val url = if (pathOrUrl.contains("://")) pathOrUrl
+        else session.serverUrl.trimEnd('/') + "/" + pathOrUrl.trimStart('/')
+        require(isServerUrl(url)) { "资源地址必须与当前服务器同源" }
+        return url
     }
 
     fun videoThumbnailUrl(videoId: Long) = absoluteUrl("videos/$videoId/thumbnail")

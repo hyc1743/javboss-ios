@@ -27,7 +27,7 @@ class AppContainer(context: Application) {
     val videoRepository = VideoRepository(apiClient)
     val favoriteRepository = FavoriteRepository(apiClient)
     // 本地鉴权代理：libVLC 播放时经它转发请求并附加会话 Cookie（懒启动）
-    val authProxy = AuthProxy(apiClient.okHttpClient, apiClient::absoluteUrl)
+    val authProxy = AuthProxy(apiClient.okHttpClient, apiClient::absoluteUrl, apiClient::isServerUrl)
 }
 
 class JavBossApp : Application(), SingletonImageLoader.Factory {

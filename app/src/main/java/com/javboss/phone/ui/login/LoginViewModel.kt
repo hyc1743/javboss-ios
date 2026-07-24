@@ -24,9 +24,9 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
 
     var uiState by mutableStateOf(
         LoginUiState(
-            // 自用默认配置：没存过地址时预填默认服务器和密码
+            // 没存过地址时仅预填局域网地址，密码必须由用户输入
             serverUrl = container.session.serverUrl.ifBlank { DEFAULT_SERVER_URL },
-            password = DEFAULT_PASSWORD,
+            password = "",
         )
     )
         private set
@@ -73,6 +73,5 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val DEFAULT_SERVER_URL = "http://192.168.1.1:8655"
-        private const val DEFAULT_PASSWORD = "admin"
     }
 }

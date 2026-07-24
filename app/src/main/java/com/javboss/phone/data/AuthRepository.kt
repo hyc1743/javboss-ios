@@ -7,8 +7,10 @@ class AuthRepository(
     private val session: SessionManager,
     private val apiClient: ApiClient,
 ) {
-    /** 登录成功后 Cookie 由 CookieJar 自动持久化 */
+    /** 登录成功后 Cookie 由 CookieJar 自动持久化。切换服务器前先清除旧会话，避免跨服务器复用。 */
     suspend fun login(serverUrl: String, password: String) {
+        apiClient.cookieJar.clear()
+        session.saveCookie("")
         session.saveServerUrl(serverUrl)
         val res = apiClient.api().login(LoginRequest(password))
         if (!res.authenticated) throw IllegalStateException("登录失败")

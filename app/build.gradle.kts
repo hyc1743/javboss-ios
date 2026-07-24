@@ -37,6 +37,13 @@ android {
     }
 
     buildTypes {
+        // 本机调试包也复用发布签名，避免 debug/release 交替安装时被 Android 视为不同应用。
+        // keystore 不入库；其他开发者未配置时仍使用默认 debug keystore。
+        debug {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

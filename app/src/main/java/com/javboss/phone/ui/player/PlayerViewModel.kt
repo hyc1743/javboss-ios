@@ -57,6 +57,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         uiState = uiState.copy(activeEngine = EngineMode.VLC, fallbackPositionMs = startPositionMs)
     }
 
+    /** 播放页内切换引擎偏好，立即从当前进度重建对应引擎。 */
+    fun selectEngineMode(mode: EngineMode, positionMs: Long) {
+        viewModelScope.launch { container.settings.saveEngineMode(mode) }
+        uiState = uiState.copy(
+            engineMode = mode,
+            activeEngine = if (mode == EngineMode.VLC) EngineMode.VLC else EngineMode.EXO,
+            fallbackPositionMs = positionMs,
+        )
+    }
+
     /** libVLC 经本地代理播放（代理负责附加会话 Cookie） */
     fun proxyUrl(url: String): String = container.authProxy.proxyUrl(url)
 

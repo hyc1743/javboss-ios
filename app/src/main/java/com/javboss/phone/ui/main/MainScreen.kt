@@ -7,7 +7,6 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -24,12 +23,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.javboss.phone.ui.favorites.FavoritesScreen
-import com.javboss.phone.ui.settings.SettingsScreen
 import com.javboss.phone.ui.videos.VideosScreen
 import com.javboss.phone.ui.works.WorksScreen
 
 /**
- * 主页：底部四 tab（视频 / 作品 / 收藏夹 / 设置）+ 末尾的登出入口。
+ * 主页：底部三 tab（视频 / 作品 / 收藏夹）+ 末尾的登出入口。
  * tab 切换只是本地状态，ViewModel 挂在 main 路由的 NavBackStackEntry 上，
  * 切 tab 不丢滚动位置和已加载数据。
  */
@@ -65,12 +63,6 @@ fun MainScreen(
                     icon = { Icon(Icons.Filled.Favorite, contentDescription = "收藏夹") },
                     label = { Text("收藏夹") },
                 )
-                NavigationBarItem(
-                    selected = tab == 3,
-                    onClick = { tab = 3 },
-                    icon = { Icon(Icons.Filled.Settings, contentDescription = "设置") },
-                    label = { Text("设置") },
-                )
                 // 登出不是 tab，点击只弹确认框，不改变选中态
                 NavigationBarItem(
                     selected = false,
@@ -92,11 +84,10 @@ fun MainScreen(
                     onOpenJavList = onOpenJavList,
                     onSessionExpired = onSessionExpired,
                 )
-                2 -> FavoritesScreen(
+                else -> FavoritesScreen(
                     onGroupClick = onFavGroupClick,
                     onSessionExpired = onSessionExpired,
                 )
-                else -> SettingsScreen()
             }
         }
     }

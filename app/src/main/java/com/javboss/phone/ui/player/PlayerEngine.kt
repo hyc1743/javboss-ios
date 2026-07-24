@@ -6,8 +6,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import androidx.media3.common.MediaItem
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -29,6 +31,9 @@ interface PlayerEngine {
     val isBuffering: Boolean
     val positionMs: Long
     val durationMs: Long
+    val decoderStatus: String
+    val subtitlesAvailable: Boolean
+    val subtitlesEnabled: Boolean
 
     /** 渲染表面（ExoPlayer 用 PlayerView 关控制条，libVLC 用 VLCVideoLayout） */
     fun createView(context: Context): View
@@ -36,6 +41,7 @@ interface PlayerEngine {
     fun play(url: String, startPositionMs: Long = 0)
     fun setPlaying(playing: Boolean)
     fun seekTo(positionMs: Long)
+    fun setSubtitlesEnabled(enabled: Boolean)
     fun stop()
     fun release()
 }
@@ -47,6 +53,8 @@ class ExoPlayerEngine(context: Context, cookieHeader: String) : PlayerEngine {
     private val player: ExoPlayer
 
     override var onError: () -> Unit = {}
+    private var subtitleEnabled = true
+    private var decoderName: String? = null
 
     init {
         val httpFactory = DefaultHttpDataSource.Factory()
@@ -60,12 +68,29 @@ class ExoPlayerEngine(context: Context, cookieHeader: String) : PlayerEngine {
                 onError()
             }
         })
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onVideoDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                this@ExoPlayerEngine.decoderName = decoderName
+            }
+        })
     }
 
     override val isPlaying: Boolean get() = player.isPlaying
     override val isBuffering: Boolean get() = player.playbackState == Player.STATE_BUFFERING
     override val positionMs: Long get() = player.currentPosition.coerceAtLeast(0)
     override val durationMs: Long get() = player.duration.coerceAtLeast(0)
+    override val decoderStatus: String
+        get() = decoderName?.let { name ->
+            if (name.startsWith("OMX.google.") || name.startsWith("c2.android.")) "软件解码" else "硬件解码"
+        } ?: "解码器初始化中"
+    override val subtitlesAvailable: Boolean
+        get() = player.currentTracks.groups.any { it.type == C.TRACK_TYPE_TEXT }
+    override val subtitlesEnabled: Boolean get() = subtitleEnabled
 
     override fun createView(context: Context): View =
         PlayerView(context).apply {
@@ -84,6 +109,14 @@ class ExoPlayerEngine(context: Context, cookieHeader: String) : PlayerEngine {
     }
 
     override fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+
+    override fun setSubtitlesEnabled(enabled: Boolean) {
+        subtitleEnabled = enabled
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !enabled)
+            .build()
+    }
     override fun stop() = player.stop()
     override fun release() = player.release()
 }
@@ -103,6 +136,7 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
     override var onError: () -> Unit = {}
 
     private var pendingSeekMs = -1L
+    private var lastSubtitleTrackId = -1
 
     @Volatile
     private var buffering = false
@@ -125,6 +159,9 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
     override val isBuffering: Boolean get() = buffering
     override val positionMs: Long get() = mediaPlayer.time.coerceAtLeast(0)
     override val durationMs: Long get() = mediaPlayer.length.coerceAtLeast(0)
+    override val decoderStatus: String get() = "自动（MediaCodec 硬解优先）"
+    override val subtitlesAvailable: Boolean get() = mediaPlayer.spuTracksCount > 0
+    override val subtitlesEnabled: Boolean get() = mediaPlayer.spuTrack >= 0
 
     override fun createView(context: Context): View =
         VLCVideoLayout(context).also { mediaPlayer.attachViews(it, null, false, false) }
@@ -143,6 +180,20 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
 
     override fun seekTo(positionMs: Long) {
         mediaPlayer.time = positionMs
+    }
+
+    override fun setSubtitlesEnabled(enabled: Boolean) {
+        if (enabled) {
+            val track = mediaPlayer.spuTracks
+                ?.firstOrNull { it.id >= 0 }
+                ?.id
+                ?: lastSubtitleTrackId.takeIf { it >= 0 }
+                ?: return
+            mediaPlayer.setSpuTrack(track)
+        } else {
+            lastSubtitleTrackId = mediaPlayer.spuTrack
+            mediaPlayer.setSpuTrack(-1)
+        }
     }
 
     override fun stop() = mediaPlayer.stop()

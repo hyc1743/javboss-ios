@@ -73,9 +73,11 @@ libvlc-all 每个 ABI 约 30MB 原生库。release 构建启用 ABI 分包（arm
 - 播放页重构为**单一页面 + 单一自绘控制条**，`PlayerEngine` 接口下挂
   `ExoPlayerEngine` / `VlcPlayerEngine` 两个实现，引擎只负责解码渲染
   （`PlayerView(useController=false)` / `VLCVideoLayout`）。
-- 新增设置 tab（底部导航第四个），播放引擎偏好三选一：
-  自动（ExoPlayer 优先、libVLC 兜底）/ 仅 ExoPlayer / 仅 libVLC，
-  `SettingsManager`（DataStore `settings`）持久化，进播放页时读取。
+- 播放页左侧设置浮层提供播放引擎三选一：自动（ExoPlayer 优先、libVLC 兜底）/
+  仅 ExoPlayer / 仅 libVLC；`SettingsManager`（DataStore `settings`）持久化，
+  切换时从当前进度重建引擎。
+- 播放页支持横滑调进度、左侧竖滑调亮度、右侧竖滑调音量；右侧锁定按钮会禁用
+  一切调整操作，仅保留返回和解锁。设置浮层可开关可用字幕并显示当前引擎/解码状态。
 - 关键实现约束（实测踩坑）：
   - `AndroidView` 的 factory 在同一组合位置只执行一次，引擎切换必须用
     `key(activeEngine)` 强制重建，否则 VLC 视图从未挂载（黑屏无声）。

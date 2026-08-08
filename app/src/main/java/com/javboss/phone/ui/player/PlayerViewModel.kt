@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.javboss.phone.JavBossApp
 import com.javboss.phone.data.EngineMode
+import com.javboss.phone.data.SeekSensitivity
 import kotlinx.coroutines.launch
 
 data class PlayerUiState(
@@ -20,6 +21,8 @@ data class PlayerUiState(
     val activeEngine: EngineMode = EngineMode.EXO,
     /** 切引擎时的续播起点（上个引擎失败时的进度） */
     val fallbackPositionMs: Long = 0,
+    /** 全屏拖动 seek 灵敏度偏好 */
+    val seekSensitivity: SeekSensitivity = SeekSensitivity.MEDIUM,
 )
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -43,6 +46,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                         loading = false,
                         engineMode = mode,
                         activeEngine = if (mode == EngineMode.VLC) EngineMode.VLC else EngineMode.EXO,
+                        seekSensitivity = container.settings.seekSensitivity,
                     )
                     container.videoRepository.reportPlay(videoId)
                 }
@@ -65,6 +69,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             activeEngine = if (mode == EngineMode.VLC) EngineMode.VLC else EngineMode.EXO,
             fallbackPositionMs = positionMs,
         )
+    }
+
+    /** 切换拖动 seek 灵敏度偏好，立即生效并持久化 */
+    fun selectSeekSensitivity(value: SeekSensitivity) {
+        viewModelScope.launch { container.settings.saveSeekSensitivity(value) }
+        uiState = uiState.copy(seekSensitivity = value)
     }
 
     /** libVLC 经本地代理播放（代理负责附加会话 Cookie） */

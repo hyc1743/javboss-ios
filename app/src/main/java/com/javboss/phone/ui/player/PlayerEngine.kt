@@ -41,6 +41,10 @@ interface PlayerEngine {
     fun play(url: String, startPositionMs: Long = 0)
     fun setPlaying(playing: Boolean)
     fun seekTo(positionMs: Long)
+
+    /** 设置播放倍速（长按加速用，1f 为原速） */
+    fun setPlaybackSpeed(speed: Float)
+
     fun setSubtitlesEnabled(enabled: Boolean)
     fun stop()
     fun release()
@@ -109,6 +113,8 @@ class ExoPlayerEngine(context: Context, cookieHeader: String) : PlayerEngine {
     }
 
     override fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+
+    override fun setPlaybackSpeed(speed: Float) = player.setPlaybackSpeed(speed)
 
     override fun setSubtitlesEnabled(enabled: Boolean) {
         subtitleEnabled = enabled
@@ -180,6 +186,10 @@ class VlcPlayerEngine(context: Context) : PlayerEngine {
 
     override fun seekTo(positionMs: Long) {
         mediaPlayer.time = positionMs
+    }
+
+    override fun setPlaybackSpeed(speed: Float) {
+        mediaPlayer.setRate(speed)
     }
 
     override fun setSubtitlesEnabled(enabled: Boolean) {

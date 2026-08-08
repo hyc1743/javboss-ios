@@ -15,13 +15,25 @@ enum class EngineMode(val label: String, val desc: String) {
     VLC("libVLC", "全格式通吃，冷门格式软解较耗性能"),
 }
 
-/** 应用设置持久化（目前只有播放引擎偏好） */
+/** 全屏拖动 seek 灵敏度：划满全屏对应的 seek 幅度 = factor × 视频时长 */
+enum class SeekSensitivity(val label: String, val factor: Float) {
+    LOW("低", 0.25f),
+    MEDIUM("中", 1f),
+    HIGH("高", 2f),
+}
+
+/** 应用设置持久化（播放引擎偏好、拖动 seek 灵敏度） */
 class SettingsManager(private val context: Context) {
 
     private val keyEngineMode = stringPreferencesKey("engine_mode")
+    private val keySeekSensitivity = stringPreferencesKey("seek_sensitivity")
 
     @Volatile
     var engineMode: EngineMode = EngineMode.AUTO
+        private set
+
+    @Volatile
+    var seekSensitivity: SeekSensitivity = SeekSensitivity.MEDIUM
         private set
 
     suspend fun restore() {
@@ -29,10 +41,18 @@ class SettingsManager(private val context: Context) {
         engineMode = prefs[keyEngineMode]
             ?.let { runCatching { EngineMode.valueOf(it) }.getOrNull() }
             ?: EngineMode.AUTO
+        seekSensitivity = prefs[keySeekSensitivity]
+            ?.let { runCatching { SeekSensitivity.valueOf(it) }.getOrNull() }
+            ?: SeekSensitivity.MEDIUM
     }
 
     suspend fun saveEngineMode(mode: EngineMode) {
         engineMode = mode
         context.settingsDataStore.edit { it[keyEngineMode] = mode.name }
+    }
+
+    suspend fun saveSeekSensitivity(value: SeekSensitivity) {
+        seekSensitivity = value
+        context.settingsDataStore.edit { it[keySeekSensitivity] = value.name }
     }
 }

@@ -22,8 +22,13 @@ class AuthRepository(
         return runCatching { apiClient.api().authStatus().authenticated }.getOrDefault(false)
     }
 
-    suspend fun logout() {
+    /** 通知服务端销毁会话。失败忽略，供登出时后台 fire-and-forget 调用。 */
+    suspend fun notifyServerLogout() {
         runCatching { apiClient.api().logout() }
+    }
+
+    /** 立即清除本地会话（内存 Cookie + DataStore），不依赖网络 */
+    suspend fun clearLocalSession() {
         apiClient.cookieJar.clear()
         session.clear()
     }

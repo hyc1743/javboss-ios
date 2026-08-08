@@ -56,12 +56,14 @@ fun JavBossNavGraph(startWithSession: Boolean) {
         }
     }
 
-    // 主动登出：通知服务端销毁会话、清空本地 Cookie 后回登录页
+    // 主动登出：本地先行（立即清会话回登录页，不被网络阻塞）；
+    // 服务端登出后台异步通知，需在清 Cookie 前发起才能带上会话
     val app = LocalContext.current.applicationContext as JavBossApp
     val scope = rememberCoroutineScope()
     val doLogout: () -> Unit = {
         scope.launch {
-            app.container.authRepository.logout()
+            launch { app.container.authRepository.notifyServerLogout() }
+            app.container.authRepository.clearLocalSession()
             goLogin()
         }
     }

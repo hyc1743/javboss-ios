@@ -19,6 +19,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -68,6 +72,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.javboss.phone.data.EngineMode
+import com.javboss.phone.data.SeekSensitivity
 import com.javboss.phone.ui.components.formatDuration
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -122,10 +127,12 @@ fun PlayerScreen(
                 activeEngine = state.activeEngine,
                 autoFallback = state.engineMode == EngineMode.AUTO,
                 startPositionMs = state.fallbackPositionMs,
+                seekSensitivity = state.seekSensitivity,
                 cookieHeader = viewModel.cookieHeader,
                 proxyUrl = viewModel::proxyUrl,
                 onSwitchToVlc = viewModel::switchToVlc,
                 onEngineModeChange = viewModel::selectEngineMode,
+                onSeekSensitivityChange = viewModel::selectSeekSensitivity,
                 onAllSourcesFailed = { viewModel.failPlayback("所有播放源均播放失败") },
                 onBack = onBack,
             )
@@ -140,10 +147,12 @@ private fun UnifiedPlayerStage(
     activeEngine: EngineMode,
     autoFallback: Boolean,
     startPositionMs: Long,
+    seekSensitivity: SeekSensitivity,
     cookieHeader: String,
     proxyUrl: (String) -> String,
     onSwitchToVlc: (Long) -> Unit,
     onEngineModeChange: (EngineMode, Long) -> Unit,
+    onSeekSensitivityChange: (SeekSensitivity) -> Unit,
     onAllSourcesFailed: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -180,6 +189,7 @@ private fun UnifiedPlayerStage(
     var subtitlesEnabled by remember { mutableStateOf(false) }
     var gestureHint by remember { mutableStateOf<String?>(null) }
     var gestureSeekTarget by remember { mutableLongStateOf(0L) }
+    var speedBoost by remember { mutableStateOf(false) }
     var brightness by remember { mutableStateOf(window?.screenBrightness().orDefaultBrightness()) }
     var volume by remember { mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) }
     // 手势协程不能随轮询进度、亮度或音量更新而重启；通过这些状态引用读取最新值。
@@ -187,6 +197,7 @@ private fun UnifiedPlayerStage(
     val currentPositionMs by rememberUpdatedState(positionMs)
     val currentDurationMs by rememberUpdatedState(durationMs)
     val currentBrightness by rememberUpdatedState(brightness)
+    val currentSeekFactor by rememberUpdatedState(seekSensitivity.factor)
 
     DisposableEffect(window) {
         val previousBrightness = window?.screenBrightness()
@@ -241,6 +252,14 @@ private fun UnifiedPlayerStage(
         }
     }
 
+    // 双击 ±10s：左/右三分之一屏快退/快进，中间暂停/继续
+    fun seekBy(deltaMs: Long) {
+        if (currentDurationMs <= 0) return
+        val target = (currentPositionMs + deltaMs).coerceIn(0, currentDurationMs)
+        currentEngine.seekTo(target)
+        gestureHint = "${if (deltaMs >= 0) "快进" else "快退"} ${abs(deltaMs) / 1000}s  ${formatDuration(target / 1000)}"
+    }
+
     val gestureModifier = if (locked) Modifier else Modifier
         .pointerInput(Unit) {
             var mode: GestureMode? = null
@@ -268,7 +287,7 @@ private fun UnifiedPlayerStage(
                     }
                     when (mode) {
                         GestureMode.SEEK -> if (currentDurationMs > 0) {
-                            gestureSeekTarget = (seekStartPositionMs + currentDurationMs * totalX / size.width)
+                            gestureSeekTarget = (seekStartPositionMs + currentDurationMs * currentSeekFactor * totalX / size.width)
                                 .toLong().coerceIn(0, currentDurationMs)
                             gestureHint = "进度  ${formatDuration(gestureSeekTarget / 1000)}"
                         }
@@ -294,7 +313,34 @@ private fun UnifiedPlayerStage(
             )
         }
         .pointerInput(Unit) {
-            detectTapGestures { controlsVisible = !controlsVisible }
+            detectTapGestures(
+                onDoubleTap = { offset ->
+                    when {
+                        offset.x < size.width / 3f -> seekBy(-10_000L)
+                        offset.x > size.width * 2 / 3f -> seekBy(10_000L)
+                        else -> {
+                            val playing = currentEngine.isPlaying
+                            currentEngine.setPlaying(!playing)
+                            gestureHint = if (playing) "已暂停" else "继续播放"
+                        }
+                    }
+                },
+                // 长按由加速手势处理；占位防止长按后抬手被当作单击
+                onLongPress = {},
+                onTap = { controlsVisible = !controlsVisible },
+            )
+        }
+        .pointerInput(Unit) {
+            // 长按加速：按住 2x，抬起或移动（转拖动 seek/亮度/音量）即恢复原速
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+                speedBoost = true
+                currentEngine.setPlaybackSpeed(SPEED_BOOST)
+                awaitTouchSlopOrCancellation(longPress.id) { _, _ -> }
+                speedBoost = false
+                currentEngine.setPlaybackSpeed(1f)
+            }
         }
 
     Box(Modifier.fillMaxSize().then(gestureModifier)) {
@@ -325,6 +371,15 @@ private fun UnifiedPlayerStage(
                 modifier = Modifier.align(Alignment.Center),
             ) {
                 Text(hint, color = Color.White, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            }
+        }
+        if (speedBoost) {
+            Surface(
+                color = Color.Black.copy(alpha = 0.72f),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+            ) {
+                Text("2x 加速中", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }
 
@@ -388,10 +443,12 @@ private fun UnifiedPlayerStage(
                 decoderStatus = engine.decoderStatus,
                 subtitlesAvailable = subtitlesAvailable,
                 subtitlesEnabled = subtitlesEnabled,
+                seekSensitivity = seekSensitivity,
                 onEngineModeChange = { mode ->
                     settingsVisible = false
                     onEngineModeChange(mode, positionMs)
                 },
+                onSeekSensitivityChange = onSeekSensitivityChange,
                 onSubtitleChange = engine::setSubtitlesEnabled,
             )
         }
@@ -417,7 +474,9 @@ private fun PlayerSettingsPanel(
     decoderStatus: String,
     subtitlesAvailable: Boolean,
     subtitlesEnabled: Boolean,
+    seekSensitivity: SeekSensitivity,
     onEngineModeChange: (EngineMode) -> Unit,
+    onSeekSensitivityChange: (SeekSensitivity) -> Unit,
     onSubtitleChange: (Boolean) -> Unit,
 ) {
     Surface(color = Color.Black.copy(alpha = 0.78f), shape = MaterialTheme.shapes.large, modifier = Modifier.width(270.dp)) {
@@ -427,6 +486,13 @@ private fun PlayerSettingsPanel(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = engineMode == mode, onClick = { onEngineModeChange(mode) })
                     Text(mode.label, color = Color.White, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+            Text("拖动灵敏度", color = Color.White, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+            SeekSensitivity.entries.forEach { value ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = seekSensitivity == value, onClick = { onSeekSensitivityChange(value) })
+                    Text(value.label, color = Color.White, modifier = Modifier.padding(start = 6.dp))
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
@@ -479,6 +545,9 @@ private fun PlaybackControls(
 }
 
 private enum class GestureMode { SEEK, BRIGHTNESS, VOLUME }
+
+/** 长按加速倍速 */
+private const val SPEED_BOOST = 2f
 
 private fun Window.screenBrightness(): Float = attributes.screenBrightness
 

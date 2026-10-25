@@ -137,13 +137,14 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
         var redirected = request
         if let url = request.url {
             // 同源才继续携带 Cookie；不同源则拒绝跟随
-            if AppState.shared.cookieJar.sameOrigin(url),
-               let cookie = AppState.shared.cookieJar.cookieHeader(for: url) {
-                redirected.setValue(cookie, forHTTPHeaderField: "Cookie")
-            } else {
+            guard AppState.shared.cookieJar.sameOrigin(url) else {
                 completionHandler(nil)
                 return
             }
+            if let cookie = AppState.shared.cookieJar.cookieHeader(for: url) {
+                redirected.setValue(cookie, forHTTPHeaderField: "Cookie")
+            }
+            redirected.setValue("JavBossiOS/0.1", forHTTPHeaderField: "User-Agent")
         }
         ctx.response = response
         completionHandler(redirected)
@@ -173,7 +174,13 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
 
         // 填充内容信息（HLS 分片和 mp4 探测都需要）
         if let infoRequest = loadingRequest.contentInformationRequest {
-            infoRequest.contentType = http.mimeType
+            if let mime = http.mimeType, !mime.isEmpty {
+                infoRequest.contentType = mime
+            } else if let wrapped = loadingRequest.request.url,
+                      let upstream = JBScheme.unwrapped(wrapped) {
+                infoRequest.contentType = upstream.path.lowercased().hasSuffix(".m3u8")
+                    ? "application/vnd.apple.mpegurl" : "video/mp4"
+            }
             if http.statusCode == 206, let contentRange = http.value(forHTTPHeaderField: "Content-Range") {
                 // "bytes 0-999/1234567"
                 if let total = contentRange.split(separator: "/").last,

@@ -42,14 +42,17 @@ final class Repository {
 
     func resolvePlayUrls(id: Int64) async throws -> [String] {
         let streams = try await getStreams(id: id)
-        var urls: [String] = []
-        // direct 永远排最前；服务端未列出 direct 时按固定格式自拼
+        var direct: [String] = []
+        var hlsUrls: [String] = []
         let directSrc = streams.sources.first { $0.kind == "direct" }?.src ?? "videos/\(id)/stream"
-        if let abs = api.absoluteUrl(directSrc) { urls.append(abs) }
-        for hls in streams.sources where hls.kind == "hls" {
-            if let abs = api.absoluteUrl(hls.src) { urls.append(abs) }
+        if let abs = api.absoluteUrl(directSrc) { direct.append(abs) }
+        for source in streams.sources where source.kind == "hls" {
+            if let abs = api.absoluteUrl(source.src) { hlsUrls.append(abs) }
         }
-        return urls
+        // Follow the server's playback recommendation. This matters for
+        // containers/codecs that browsers can transcode through HLS but AVPlayer
+        // cannot decode as a direct file.
+        return streams.preferredKind == "hls" ? hlsUrls + direct : direct + hlsUrls
     }
 
     func reportPlay(id: Int64) async { try? await api.postVoid("videos/\(id)/play") }

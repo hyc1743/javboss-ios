@@ -1,106 +1,76 @@
-# JavBoss Phone
+# JavBoss iOS
 
-[JavBoss](https://github.com/Solr159/JavBoss) 的第三方 Android 手机客户端（学习项目）。
-通过 JavBoss 服务端的 REST API 获取数据，以手机触摸交互呈现。
+[JavBoss](https://github.com/Solr159/JavBoss) 的第三方 iOS 客户端（学习项目）。
+通过 JavBoss 自托管服务端的 REST API 获取数据，以原生 SwiftUI 呈现，
+云端（GitHub Actions）自动构建 IPA。
 
+> 本仓库 fork 自 [zsdcxd/javboss-phone](https://github.com/zsdcxd/javboss-phone)
+> （Android 客户端，保留在 `android/` 目录作为参考实现）。
 > 本项目与 JavBoss 官方无关，仅调用其自托管服务端的 HTTP API。
 
-## 功能
+## 功能覆盖
 
-- **登录**：服务器地址 + 密码，会话 Cookie 本地持久化（服务端会话 14 天有效，
-  禁用系统备份）；
-  地址可省略协议头（自动补 `http://`）；底部导航"退出"可主动登出
-  （通知服务端销毁会话并清空本地 Cookie）
-- **底部导航**：三个内容 tab（视频/作品/收藏夹）+ 退出入口
-  - **视频**：原始视频列表，16:9 缩略图两列瀑布流，无限加载、搜索、排序、下拉刷新
-  - **作品**：JAV 作品库，四个卡片墙视角（作品/女优/片商/系列），两列瀑布流、
-    无限加载、搜索（点搜索图标展开）；作品视角带筛选底部弹层
-    （排序/番号前缀/标签多选/仅单体/随机）；点女优/片商/系列卡片跳对应过滤作品列表
-  - **收藏夹**：作品收藏夹列表（新建/重命名/删除），点进查看条目，长按移除
-- **详情页**：封面、番号、发行日期、时长、片商、系列、演员、标签、视频截图；
-  片商/系列/演员/标签均可点击跳转到对应过滤作品列表；外部链接直达 JavDB；
-  操作栏含播放、收藏（勾选收藏夹 + 新建收藏夹）、编辑（标题/发行日期/时长/片商/系列/演员/标签，支持新建标签）
-- **播放**：统一播放页 + 双引擎（引擎只负责解码渲染，页面和控制条只有一套，
-  自绘控制条点按显隐：播放/暂停、进度拖动、时间、当前引擎标识、缓冲指示），
-  进入自动横屏 + 沉浸模式；左侧设置浮层可切换引擎/字幕/拖动灵敏度并显示
-  解码状态，右侧可锁定控制；横滑调进度（灵敏度可选低/中/高）、左侧竖滑调
-  亮度、右侧竖滑调音量；双击左/右三分之一屏快退/快进 10s、双击中间
-  暂停/继续，长按 2x 加速（松开或移动手指恢复）
-  - 首选 Media3 ExoPlayer：direct 直流优先（支持 Range 拖动；服务端按浏览器
-    标准未列出 direct 源时客户端自拼 `/videos/{id}/stream` 补上），失败自动
-    fallback 到 HLS 转码流
-  - ExoPlayer 全部源失败自动切换 libVLC（内置完整 ffmpeg，wmv/rmvb/flv/avi
-    等冷门格式软解兜底），从失败进度续播；libVLC 无法注入 Cookie，
-    播放请求经 App 内本地代理（127.0.0.1）转发并附加会话 Cookie
+对照上游 JavBoss 服务端 API 完整适配（`internal/api` 全部核心路由）：
 
-## 使用
+| 模块 | 功能 |
+| --- | --- |
+| 登录 | 服务器地址 + 密码、会话 Cookie 持久化（14 天自动续期）、登出销毁会话 |
+| 视频 | 双列网格、无限加载、搜索/排序/随机、标签筛选、隐藏已关联作品；详情页含截图（设封面/删除/查看）、标签编辑、多位置管理（重命名/删除）、关联 JAV 作品（候选番号/在线查询/手动填写）、播放次数、观看进度 |
+| 作品 | 作品/女优/片商/系列四视角卡片墙，搜索、排序、筛选（番号前缀/标签/女优/片商/系列/仅单体/收藏夹/喜爱度范围/随机种子）；作品详情：封面、元数据、演员、标签、预览图（抓取/查看）、关联视频、喜爱度、收藏夹、标题翻译、编辑、JavDB/Avsox 外链；女优：档案（身高/三围/生日/别名）、封面选择、编辑；片商：别名/番号前缀/系列、编辑；系列：译名编辑、名称翻译 |
+| 收藏 | 作品/女优/片商/系列四类收藏夹：新建/重命名/删除/拖动排序、条目移除/排序、批量搜索添加作品 |
+| 目录 | 目录列表（扫描进度）、添加（含服务器文件系统浏览器）、立即扫描/处理、停用/自动扫描/周期设置、删除 |
+| 下载 | 下载任务列表（进度/重试/取消/删除）、新建磁力任务、下载器设置（本地目录/并发/最小体积、CloudDrive2 配置与连接测试） |
+| 标签 | 作品标签 + 视频标签两套体系：增删改、分类 CRUD、批量归类、JavBus 分类导入 |
+| 更多 | 修改密码、扩展 API 令牌（增删/轮换/复制）、服务器状态（资源监控、FFmpeg 工具下载、数据源可用性检测、完整配置 JSON）、服务器 LAN 访问开关 |
+| 播放 | 全屏横屏 + 自绘控制条：播放/暂停、进度拖动、缓冲指示、字幕开关；direct 优先、HLS 转码兜底；单击显隐控制条、双击快进/快退 10s、长按 2x 加速、横滑调进度（灵敏度可调）、左竖滑亮度、右竖滑音量、锁定；观看时长上报（播放会话），续播提示 |
 
-### 服务端准备：让 Windows 桌面版允许局域网访问
+### 与安卓版 / 桌面的差异
 
-JavBoss 电脑版默认只允许本机访问，手机需要先开启局域网访问。请按所用
-JavBoss 版本选择下面的方式。
+- 播放引擎为 AVPlayer（系统硬解，direct + HLS），Cookie 通过
+  `AVAssetResourceLoaderDelegate` 注入（对应安卓版 AuthProxy 本地代理方案）。
+  服务器转码 HLS 覆盖冷门封装（mkv/wmv 等），因此未引入 libVLC；
+  AVPlayer 无法直接解码的直链格式会自动走 HLS 转码流。
+- 桌面端专属功能（mpv 播放器热键、浏览器集成等）不属于移动客户端范畴，
+  通过扩展 API 令牌模块与浏览器扩展联动。
 
-#### v1.9.0 及之后：在全局设置中开启（推荐）
+## 服务端准备
 
-1. 在电脑浏览器打开 JavBoss，进入“全局设置”。
-2. 开启“允许局域网访问”。
-3. 按页面提示重启 JavBoss。
-4. 首次启动若弹出 Windows 防火墙提示，勾选“专用网络”并允许访问。
+1. 在电脑上运行 [JavBoss](https://github.com/Solr159/JavBoss)（v1.9.0+）。
+2. 进入「全局设置」开启「允许局域网访问」，按提示重启。
+3. 首次启动若弹出 Windows 防火墙提示，勾选「专用网络」并允许访问。
 
-#### v1.9.0 之前：使用启动参数开启
+## 构建 IPA（云端）
 
-旧版没有上述设置项时，启动 JavBoss 时加上 `-addr 0.0.0.0:8655`：
+推送或手动触发 `.github/workflows/build-ipa.yml`（macOS runner）：
 
-1. **打开 cmd**：在 `javboss.exe` 所在文件夹的地址栏输入 `cmd` 回车，
-   会直接以该目录为工作目录打开命令行窗口。
-2. **输入启动命令**：
+- **默认产物**：`JavBoss-unsigned.ipa`（未签名，需侧载工具用你自己的
+  Apple ID 重签后安装，如 AltStore / Sideloadly / Esign）。
+- **可选签名构建**：在仓库 Settings → Secrets and variables → Actions 中配置
+  `IOS_P12_BASE64`（证书 p12 base64）、`IOS_P12_PASSWORD`、`IOS_MOBILEPROVISION_BASE64`、
+  `IOS_SIGNING_IDENTITY`（证书名）、`IOS_DEVELOPMENT_TEAM`（Team ID），
+  即会额外产出已签名 IPA，可直接安装到配置文件包含的设备。
 
-   ```
-   javboss.exe -addr 0.0.0.0:8655
-   ```
-
-   也可以把 `javboss.exe` 直接拖进 cmd 窗口以填入完整路径，再在末尾补上参数：
-
-   ```
-   C:\Apps\JavBoss\javboss.exe -addr 0.0.0.0:8655
-   ```
-
-3. **放行防火墙**：首次启动若弹出 Windows 防火墙提示，勾选“专用网络”并允许访问；
-   若没有弹窗，手动添加：设置 → Windows Defender 防火墙 → 高级设置 →
-   入站规则 → 新建规则 → 端口 → TCP 8655 → 允许连接。
-
-#### 连接手机
-
-1. 在 cmd 中运行 `ipconfig`，找到电脑的“IPv4 地址”（如 `192.168.1.10`）。
-2. 让手机与电脑连接同一局域网；在登录页填入
-   `http://192.168.1.10:8655` 和网页版登录密码。
-
-注意事项：
-
-- 使用旧版启动参数时，cmd 窗口需保持打开；关闭窗口即停止服务。如需常驻，
-  可建一个快捷方式，把参数写进快捷方式的“目标”栏，再配任务计划程序开机启动
-- 端口以 JavBoss 的 `config.toml` 里的 `port` 为准（默认 8655）；旧版的
-  `-addr` 参数只决定监听地址，改过端口时手机登录地址也要对应修改
-- 播放走的是服务端 HTTP 流（direct / HLS），与电脑上的 mpv 无关，
-  不影响网页版继续用 mpv 播放
-- 服务暴露到局域网后，知道密码的人才能访问，请设置强密码
-- 会话 Cookie 只会发送给当前登录的同源服务器；切换服务器或退出登录会清除旧会话
-
-## 构建
+### 本地构建
 
 ```bash
-# debug
-gradlew.bat assembleDebug
-
-# release（需要 keystore.properties + keystore/release.jks）
-gradlew.bat assembleRelease
+brew install xcodegen
+cd ios
+xcodegen generate
+open JavBoss.xcodeproj   # Xcode 中直接运行（需自选签名团队）
 ```
 
-产物在 `app/build/outputs/apk/`。release 按 ABI 分包
-（arm64-v8a / armeabi-v7a / x86_64 + universal；libvlc 原生库每 ABI 约 30MB，
-按设备安装对应包即可）。applicationId 为 `com.javboss.phone`，
-可与 TV 版（`com.javboss.tv`）共存安装。
+## 目录结构
 
-## License
+```
+android/   上游 javboss-phone（Jetpack Compose 安卓客户端，参考实现）
+ios/       SwiftUI iOS 客户端（XcodeGen 工程）
+  JavBoss/
+    App/        入口、会话根视图、屏幕方向控制
+    Core/       会话/Cookie/API 客户端/模型/通用组件
+    Features/   登录、视频、作品、收藏、目录、下载、标签、更多、播放器
+.github/workflows/build-ipa.yml   云端构建 IPA
+```
 
-GPL-3.0
+## 许可
+
+遵循上游许可（GPL-3.0，见 `android/LICENSE`）。本项目代码在相同许可下分发。

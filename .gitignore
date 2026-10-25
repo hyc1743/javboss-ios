@@ -13,3 +13,11 @@ app/build/
 keystore.properties
 keystore/
 AGENTS.md
+
+# iOS (xcodegen 生成物不入库)
+ios/JavBoss.xcodeproj/
+ios/build/
+ios/JavBoss/Info.plist
+*.ipa
+*.p12
+*.mobileprovision

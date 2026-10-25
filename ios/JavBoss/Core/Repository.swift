@@ -49,10 +49,10 @@ final class Repository {
         for source in streams.sources where source.kind == "hls" {
             if let abs = api.absoluteUrl(source.src) { hlsUrls.append(abs) }
         }
-        // Follow the server's playback recommendation. This matters for
-        // containers/codecs that browsers can transcode through HLS but AVPlayer
-        // cannot decode as a direct file.
-        return streams.preferredKind == "hls" ? hlsUrls + direct : direct + hlsUrls
+        // AVPlayer cannot decode every container/codec that the web player can
+        // serve. HLS is the server's transcoded compatibility path, so prefer
+        // it on iOS and retain direct as a fallback for already-compatible files.
+        return hlsUrls + direct
     }
 
     func reportPlay(id: Int64) async { try? await api.postVoid("videos/\(id)/play") }

@@ -166,6 +166,25 @@ struct WatchedMsRequest: Encodable { let watchedMs: Int64 }
 
 // MARK: - JAV 作品
 
+private struct SampleImage: Decodable {
+    let value: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let detail = try c.decodeIfPresent(String.self, forKey: .detailURL) {
+            value = detail
+        } else if let thumbnail = try c.decodeIfPresent(String.self, forKey: .thumbnailURL) {
+            value = thumbnail
+        } else {
+            value = ""
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case thumbnailURL, detailURL
+    }
+}
+
 struct Jav: Decodable, Identifiable {
     let id: Int64
     var code: String
@@ -192,6 +211,37 @@ struct Jav: Decodable, Identifiable {
         let base = title.isEmpty ? code : title
         if let zh = zhTitle, !zh.isEmpty { return zh }
         return base
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int64.self, forKey: .id)
+        code = try c.decodeIfPresent(String.self, forKey: .code) ?? ""
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        zhTitle = try c.decodeIfPresent(String.self, forKey: .zhTitle)
+        studioId = try c.decodeIfPresent(Int64.self, forKey: .studioId)
+        studio = try c.decodeIfPresent(JavStudio.self, forKey: .studio)
+        seriesId = try c.decodeIfPresent(Int64.self, forKey: .seriesId)
+        series = try c.decodeIfPresent(JavSeriesSummary.self, forKey: .series)
+        releaseUnix = try c.decodeIfPresent(Int64.self, forKey: .releaseUnix)
+        durationMin = try c.decodeIfPresent(Int.self, forKey: .durationMin)
+        isUncensored = try c.decodeIfPresent(Bool.self, forKey: .isUncensored)
+        let images = try c.decodeIfPresent([SampleImage].self, forKey: .sampleImages) ?? []
+        sampleImages = images.map(\.value).filter { !$0.isEmpty }
+        favoriteRating = try c.decodeIfPresent(Double.self, forKey: .favoriteRating)
+        watchedMs = try c.decodeIfPresent(Int64.self, forKey: .watchedMs)
+        coverCropPosition = try c.decodeIfPresent(Double.self, forKey: .coverCropPosition)
+        tags = try c.decodeIfPresent([JavTag].self, forKey: .tags)
+        idols = try c.decodeIfPresent([JavIdolSummary].self, forKey: .idols)
+        videos = try c.decodeIfPresent([Video].self, forKey: .videos)
+        favoriteCount = try c.decodeIfPresent(Int64.self, forKey: .favoriteCount)
+        fetchedAt = try c.decodeIfPresent(String.self, forKey: .fetchedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, code, title, zhTitle, studioId, studio, seriesId, series
+        case releaseUnix, durationMin, isUncensored, sampleImages, favoriteRating
+        case watchedMs, coverCropPosition, tags, idols, videos, favoriteCount, fetchedAt
     }
 }
 
@@ -379,7 +429,19 @@ struct JavIdolCoverOption: Decodable, Identifiable {
 }
 struct IdolCoverOptionsResponse: Decodable { let items: [JavIdolCoverOption] }
 struct JavIdolCoverRequest: Encodable { let javId: Int64; let cropLeft: Double }
-struct SampleImagesResponse: Decodable { let items: [String]? }
+struct SampleImagesResponse: Decodable {
+    let items: [String]?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let images = try c.decodeIfPresent([SampleImage].self, forKey: .sampleImages) ?? []
+        items = images.map(\.value).filter { !$0.isEmpty }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sampleImages
+    }
+}
 
 // MARK: - 收藏夹
 

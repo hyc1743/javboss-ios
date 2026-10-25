@@ -37,6 +37,7 @@ enum PanMode {
 @MainActor
 final class PlayerModel: ObservableObject {
     let videoId: Int64
+    let locationId: Int64?
     let initialWatchedMs: Int64
 
     @Published var engine: AVPlayerEngine?
@@ -71,8 +72,9 @@ final class PlayerModel: ObservableObject {
 
     private let repo: Repository
 
-    init(videoId: Int64, initialWatchedMs: Int64) {
+    init(videoId: Int64, locationId: Int64? = nil, initialWatchedMs: Int64) {
         self.videoId = videoId
+        self.locationId = locationId
         self.initialWatchedMs = initialWatchedMs
         self.repo = Repository(api: AppState.shared.api)
         self.seekSensitivity = SeekSensitivity(rawValue: UserDefaults.standard.string(forKey: "player_seek_sensitivity") ?? "") ?? .medium
@@ -81,7 +83,7 @@ final class PlayerModel: ObservableObject {
     func load() {
         Task {
             do {
-                let resolved = try await repo.resolvePlayUrls(id: videoId)
+                let resolved = try await repo.resolvePlayUrls(id: videoId, locationId: locationId)
                 let ready = await MainActor.run {
                     self.urls = resolved
                     guard !self.urls.isEmpty else {
@@ -162,7 +164,7 @@ final class PlayerModel: ObservableObject {
 
     private func startSession() async {
         do {
-            sessionId = try await repo.createPlaybackSession(videoId: videoId)
+            sessionId = try await repo.createPlaybackSession(videoId: videoId, locationId: locationId ?? 0)
         } catch {
             sessionId = nil
         }
@@ -480,15 +482,17 @@ struct VideoLayer: UIViewRepresentable {
 
 struct PlayerView: View {
     let videoId: Int64
+    let locationId: Int64?
     let watchedMs: Int64
 
     @StateObject private var model: PlayerModel
     @Environment(\.dismiss) private var dismiss
 
-    init(videoId: Int64, watchedMs: Int64) {
+    init(videoId: Int64, locationId: Int64? = nil, watchedMs: Int64) {
         self.videoId = videoId
+        self.locationId = locationId
         self.watchedMs = watchedMs
-        _model = StateObject(wrappedValue: PlayerModel(videoId: videoId, initialWatchedMs: watchedMs))
+        _model = StateObject(wrappedValue: PlayerModel(videoId: videoId, locationId: locationId, initialWatchedMs: watchedMs))
     }
 
     var body: some View {

@@ -38,10 +38,16 @@ final class Repository {
     }
 
     func getVideo(id: Int64) async throws -> Video { try await api.get("videos/\(id)") }
-    func getStreams(id: Int64) async throws -> PlaybackInfo { try await api.get("videos/\(id)/streams") }
+    func getStreams(id: Int64, locationId: Int64? = nil) async throws -> PlaybackInfo {
+        var query: [URLQueryItem] = []
+        if let locationId, locationId > 0 {
+            query.append(URLQueryItem(name: "location_id", value: String(locationId)))
+        }
+        return try await api.get("videos/\(id)/streams", query: query)
+    }
 
-    func resolvePlayUrls(id: Int64) async throws -> [String] {
-        let streams = try await getStreams(id: id)
+    func resolvePlayUrls(id: Int64, locationId: Int64? = nil) async throws -> [String] {
+        let streams = try await getStreams(id: id, locationId: locationId)
         var direct: [String] = []
         var hlsUrls: [String] = []
         let directSrc = streams.sources.first { $0.kind == "direct" }?.src ?? "videos/\(id)/stream"
@@ -49,10 +55,7 @@ final class Repository {
         for source in streams.sources where source.kind == "hls" {
             if let abs = api.absoluteUrl(source.src) { hlsUrls.append(abs) }
         }
-        // AVPlayer cannot decode every container/codec that the web player can
-        // serve. HLS is the server's transcoded compatibility path, so prefer
-        // it on iOS and retain direct as a fallback for already-compatible files.
-        return hlsUrls + direct
+        return streams.preferredKind == "hls" ? hlsUrls + direct : direct + hlsUrls
     }
 
     func reportPlay(id: Int64) async { try? await api.postVoid("videos/\(id)/play") }

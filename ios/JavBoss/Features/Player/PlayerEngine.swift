@@ -262,12 +262,17 @@ final class AVPlayerEngine: ObservableObject {
     func load(urlString: String) {
         failed = false
         loader = CookieResourceLoader()
-        guard let wrapped = JBScheme.rewrapped(urlString) else {
+        guard let url = URL(string: urlString), AppState.shared.cookieJar.sameOrigin(url) else {
             failed = true
             return
         }
-        let newAsset = AVURLAsset(url: wrapped)
-        newAsset.resourceLoader.setDelegate(loader, queue: DispatchQueue(label: "javboss.resourceLoader"))
+        var headers: [String: String] = ["User-Agent": "JavBossiOS/0.1"]
+        if let cookie = AppState.shared.cookieJar.cookieHeader(for: url) {
+            headers["Cookie"] = cookie
+        }
+        let newAsset = AVURLAsset(url: url, options: [
+            AVURLAssetHTTPHeaderFieldsKey: headers,
+        ])
         asset = newAsset
         let item = AVPlayerItem(asset: newAsset)
         statusObserver = item.observe(\.status, options: [.new]) { [weak self] item, _ in

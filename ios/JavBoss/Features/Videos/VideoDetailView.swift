@@ -74,7 +74,9 @@ struct VideoDetailView: View {
         .task { await vm.load() }
         .errorAlert(vm.errorMessage) { vm.clearError() }
         .fullScreenCover(isPresented: $showPlayer) {
-            PlayerView(videoId: vm.videoId, watchedMs: vm.video?.watchedMs ?? 0)
+            PlayerView(videoId: vm.videoId,
+                       locationId: vm.video?.locationId,
+                       watchedMs: vm.video?.watchedMs ?? 0)
         }
         .sheet(isPresented: $showTagsEditor) {
             VideoTagsEditorView(videoId: vm.videoId) {

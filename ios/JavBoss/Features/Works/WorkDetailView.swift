@@ -46,7 +46,8 @@ final class WorkDetailVM: ObservableObject {
 
     func refreshSampleImages() {
         perform("抓取预览图") {
-            sampleImages = try await Repository(api: AppState.shared.api).resolveJavSampleImages(id: javId)
+            let images = try await Repository(api: AppState.shared.api).resolveJavSampleImages(id: self.javId)
+            self.sampleImages = images
         }
     }
 }

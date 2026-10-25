@@ -261,8 +261,8 @@ final class PlayerModel: ObservableObject {
         guard let engine else { return }
         switch panMode {
         case .pending:
-            if abs(translation.width) > 10 || abs(translation.height) > 10 {
-                if abs(translation.width) > abs(translation.height) {
+            if abs(translation.x) > 10 || abs(translation.y) > 10 {
+                if abs(translation.x) > abs(translation.y) {
                     panMode = .seek
                     seekPreviewMs = panStartPositionMs
                 } else {
@@ -273,19 +273,19 @@ final class PlayerModel: ObservableObject {
             }
         case .seek:
             let width = max(UIScreen.main.bounds.width, 1)
-            let ratio = Double(translation.width / width)
+            let ratio = Double(translation.x / width)
             let duration = Double(max(engine.durationMs, 1))
             let delta = ratio * duration * seekSensitivity.factor
             let target = Double(panStartPositionMs) + delta
             seekPreviewMs = Int64(max(0, min(target, Double(engine.durationMs))))
         case .brightness:
             let height = max(UIScreen.main.bounds.height, 1)
-            let delta = Double(-translation.height / height)
+            let delta = Double(-translation.y / height)
             brightnessPreview = max(0.05, min(1, panStartBrightness + delta))
             UIScreen.main.brightness = brightnessPreview
         case .volume:
             let height = max(UIScreen.main.bounds.height, 1)
-            let delta = Float(-translation.height / height)
+            let delta = Float(-translation.y / height)
             volumePreview = max(0, min(1, panStartVolume + delta))
             VolumeControl.shared.set(volumePreview)
         case .idle:

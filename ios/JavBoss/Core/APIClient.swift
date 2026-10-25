@@ -114,7 +114,7 @@ final class APIClient {
         return request
     }
 
-    private func handleResponse(_ response: URLResponse?, data: Data?, allow401: Bool = false) throws -> Data {
+    func handleResponse(_ response: URLResponse?, data: Data?, allow401: Bool = false) throws -> Data {
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.network("网络错误：无响应")
         }

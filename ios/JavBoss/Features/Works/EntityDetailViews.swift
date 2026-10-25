@@ -214,22 +214,24 @@ struct IdolWorksList: View {
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
-        if loading && works.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-        } else if works.isEmpty {
-            Text("暂无作品")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else {
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(works) { jav in
-                    NavigationLink {
-                        WorkDetailView(javId: jav.id)
-                    } label: {
-                        WorkCard(jav: jav)
+        Group {
+            if loading && works.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else if works.isEmpty {
+                Text("暂无作品")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(works) { jav in
+                        NavigationLink {
+                            WorkDetailView(javId: jav.id)
+                        } label: {
+                            WorkCard(jav: jav)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -618,22 +620,24 @@ struct StudioWorksList: View {
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
-        if loading && works.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-        } else if works.isEmpty {
-            Text("暂无作品")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else {
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(works) { jav in
-                    NavigationLink {
-                        WorkDetailView(javId: jav.id)
-                    } label: {
-                        WorkCard(jav: jav)
+        Group {
+            if loading && works.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else if works.isEmpty {
+                Text("暂无作品")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(works) { jav in
+                        NavigationLink {
+                            WorkDetailView(javId: jav.id)
+                        } label: {
+                            WorkCard(jav: jav)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -869,22 +873,24 @@ struct SeriesWorksList: View {
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
-        if loading && works.isEmpty {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-        } else if works.isEmpty {
-            Text("暂无作品")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else {
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(works) { jav in
-                    NavigationLink {
-                        WorkDetailView(javId: jav.id)
-                    } label: {
-                        WorkCard(jav: jav)
+        Group {
+            if loading && works.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else if works.isEmpty {
+                Text("暂无作品")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(works) { jav in
+                        NavigationLink {
+                            WorkDetailView(javId: jav.id)
+                        } label: {
+                            WorkCard(jav: jav)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

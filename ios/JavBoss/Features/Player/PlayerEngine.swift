@@ -62,13 +62,13 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
                         shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
         guard let wrapped = loadingRequest.request.url,
               let upstream = JBScheme.unwrapped(wrapped) else {
-            loadingRequest.finish(with: NSError(domain: "javboss", code: -1,
-                                                userInfo: [NSLocalizedDescriptionKey: "无效的资源地址"]))
+            loadingRequest.finishLoading(with: NSError(domain: "javboss", code: -1,
+                                                       userInfo: [NSLocalizedDescriptionKey: "无效的资源地址"]))
             return false
         }
         guard AppState.shared.cookieJar.sameOrigin(upstream) else {
-            loadingRequest.finish(with: NSError(domain: "javboss", code: -2,
-                                                userInfo: [NSLocalizedDescriptionKey: "资源地址与服务器不同源"]))
+            loadingRequest.finishLoading(with: NSError(domain: "javboss", code: -2,
+                                                       userInfo: [NSLocalizedDescriptionKey: "资源地址与服务器不同源"]))
             return false
         }
 
@@ -81,7 +81,7 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
 
         // 字节范围：AVPlayer 拖动 / mp4 探测依赖
         let offset = loadingRequest.dataRequest?.requestedOffset ?? 0
-        let length = loadingRequest.dataRequest?.requestedLength ?? -1
+        let length = Int64(loadingRequest.dataRequest?.requestedLength ?? -1)
         if length >= 0 && (offset > 0 || length > 0) {
             if length == 0 {
                 request.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range")
@@ -156,18 +156,18 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
         if let error = error {
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
-                loadingRequest.finish(with: NSError(domain: "javboss", code: NSURLErrorCancelled,
-                                                    userInfo: [NSLocalizedDescriptionKey: "已取消"]))
+                loadingRequest.finishLoading(with: NSError(domain: "javboss", code: NSURLErrorCancelled,
+                                                           userInfo: [NSLocalizedDescriptionKey: "已取消"]))
             } else {
-                loadingRequest.finish(with: error)
+                loadingRequest.finishLoading(with: error)
             }
             return
         }
 
         let http = ctx.response as? HTTPURLResponse
         guard let http, (200..<300).contains(http.statusCode) else {
-            loadingRequest.finish(with: NSError(domain: "javboss", code: http?.statusCode ?? -1,
-                                                userInfo: [NSLocalizedDescriptionKey: "服务器返回 \(http?.statusCode ?? -1)"]))
+            loadingRequest.finishLoading(with: NSError(domain: "javboss", code: http?.statusCode ?? -1,
+                                                       userInfo: [NSLocalizedDescriptionKey: "服务器返回 \(http?.statusCode ?? -1)"]))
             return
         }
 
@@ -195,7 +195,7 @@ final class CookieResourceLoader: NSObject, AVAssetResourceLoaderDelegate, URLSe
                 dataRequest.respond(with: ctx.data)
             }
         }
-        loadingRequest.finish()
+        loadingRequest.finishLoading()
     }
 }
 

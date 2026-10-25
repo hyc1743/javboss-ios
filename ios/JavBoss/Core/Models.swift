@@ -12,6 +12,8 @@ struct EntityIdsRequest: Encodable { let entityIds: [Int64] }
 struct GroupIdsRequest: Encodable { let groupIds: [Int64] }
 struct VideoIdsRequest: Encodable { let videoIds: [Int64] }
 struct TagIdRequest: Encodable { let tagId: Int64 }
+struct VideoTagAssignRequest: Encodable { let videoIds: [Int64]; let tagId: Int64 }
+struct VideoTagsReplaceRequest: Encodable { let videoIds: [Int64]; let tagIds: [Int64] }
 struct UrlResponse: Decodable { let url: String }
 
 // MARK: - 视频
@@ -264,7 +266,6 @@ struct JavTag: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, name, simplifiedName, isUser, provider, categoryId
         case category = "category"
-        case categoryName = "category"
         case count
     }
 
@@ -276,8 +277,12 @@ struct JavTag: Decodable, Identifiable {
         isUser = try c.decodeIfPresent(Bool.self, forKey: .isUser)
         provider = try c.decodeIfPresent(Int.self, forKey: .provider)
         categoryId = try c.decodeIfPresent(Int64.self, forKey: .categoryId)
-        category = try c.decodeIfPresent(JavTagCategory.self, forKey: .category)
-        categoryName = try c.decodeIfPresent(String.self, forKey: .categoryName)
+        if let cat = try? c.decodeIfPresent(JavTagCategory.self, forKey: .category) {
+            category = cat
+        }
+        if let nameValue = try? c.decodeIfPresent(String.self, forKey: .category) {
+            categoryName = nameValue
+        }
         count = try c.decodeIfPresent(Int64.self, forKey: .count)
     }
 }

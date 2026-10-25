@@ -43,12 +43,16 @@
 
 推送或手动触发 `.github/workflows/build-ipa.yml`（macOS runner）：
 
-- **默认产物**：`JavBoss-unsigned.ipa`（未签名，需侧载工具用你自己的
-  Apple ID 重签后安装，如 AltStore / Sideloadly / Esign）。
+- **直接下载（推荐）**：每次构建成功后自动发布为 GitHub Release
+  （滚动 tag `ios-latest`，Prerelease）：
+  https://github.com/hyc1743/javboss-ios/releases/tag/ios-latest
+  Release 附件 `JavBoss-unsigned.ipa` 未签名，需侧载工具用你自己的
+  Apple ID 重签后安装（AltStore / Sideloadly / Esign）。
+- 构建产物同时存于 Actions Artifact（90 天有效）。
 - **可选签名构建**：在仓库 Settings → Secrets and variables → Actions 中配置
   `IOS_P12_BASE64`（证书 p12 base64）、`IOS_P12_PASSWORD`、`IOS_MOBILEPROVISION_BASE64`、
   `IOS_SIGNING_IDENTITY`（证书名）、`IOS_DEVELOPMENT_TEAM`（Team ID），
-  即会额外产出已签名 IPA，可直接安装到配置文件包含的设备。
+  已签名 IPA 会自动追加到同一个 Release，可直接安装到配置文件包含的设备。
 
 ### 本地构建
 

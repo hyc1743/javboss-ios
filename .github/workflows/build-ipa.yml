@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # 发布 Release 需要
 
 jobs:
   build-ipa:
@@ -52,6 +52,23 @@ jobs:
           zip -r -y JavBoss-unsigned.ipa Payload
           ls -lh JavBoss-unsigned.ipa
 
+      - name: Publish IPA as GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
+          gh release create ios-latest ios/JavBoss-unsigned.ipa \
+            --title "JavBoss iOS 最新构建" \
+            --notes "自动构建产物：未签名 IPA（侧载需用 AltStore / Sideloadly 重签）。
+
+- 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
+- 提交：${{ github.sha }}
+- 最低系统：iOS 16
+
+配置签名 Secrets（IOS_P12_BASE64 等）后，此 Release 会额外附带已签名 IPA。" \
+            --target main \
+            --prerelease
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
@@ -62,6 +79,7 @@ jobs:
   # 可选：提供签名材料时构建已签名 IPA（免侧载工具重签）
   build-signed:
     name: Build signed IPA (optional)
+    needs: build-ipa
     runs-on: macos-15
     timeout-minutes: 60
     env:
@@ -133,6 +151,12 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/JavBoss.app Payload/
           zip -r -y JavBoss-signed.ipa Payload
           ls -lh JavBoss-signed.ipa
+
+      - name: Attach signed IPA to Release
+        if: steps.check.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ios-latest ios/JavBoss-signed.ipa --clobber
 
       - name: Upload signed IPA artifact
         if: steps.check.outputs.available == 'true'

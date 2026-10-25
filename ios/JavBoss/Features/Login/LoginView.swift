@@ -77,6 +77,7 @@ struct LoginView: View {
         do {
             try await Repository(api: AppState.shared.api).login(serverUrl: serverUrl, password: password)
             AppState.shared.loggedIn = true
+            WatchedProgressStore.shared.start()
         } catch {
             errorMessage = (error as? ApiError)?.localizedDescription ?? error.localizedDescription
         }

@@ -271,7 +271,7 @@ final class AVPlayerEngine: ObservableObject {
             headers["Cookie"] = cookie
         }
         let newAsset = AVURLAsset(url: url, options: [
-            AVURLAssetHTTPHeaderFieldsKey: headers,
+            "AVURLAssetHTTPHeaderFieldsKey": headers,
         ])
         asset = newAsset
         let item = AVPlayerItem(asset: newAsset)

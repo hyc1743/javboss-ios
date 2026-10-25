@@ -56,16 +56,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          NOTES="自动构建产物：未签名 IPA（侧载需用 AltStore / Sideloadly 重签）。
+          - 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
+          - 提交：${{ github.sha }}
+          - 最低系统：iOS 16
+          配置签名 Secrets（IOS_P12_BASE64 等）后，此 Release 会额外附带已签名 IPA。"
           gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
           gh release create ios-latest ios/JavBoss-unsigned.ipa \
             --title "JavBoss iOS 最新构建" \
-            --notes "自动构建产物：未签名 IPA（侧载需用 AltStore / Sideloadly 重签）。
-
-- 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
-- 提交：${{ github.sha }}
-- 最低系统：iOS 16
-
-配置签名 Secrets（IOS_P12_BASE64 等）后，此 Release 会额外附带已签名 IPA。" \
+            --notes "$NOTES" \
             --target main \
             --prerelease
 

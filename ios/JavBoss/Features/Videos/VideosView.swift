@@ -61,7 +61,7 @@ struct VideosView: View {
                                     Button {
                                         queue.add(video)
                                     } label: {
-                                        Label("加入播放列表", systemImage: "text.badge.plus")
+                                        Label("Add to playlist", systemImage: "text.badge.plus")
                                     }
                                 }
                                 .task {
@@ -213,7 +213,7 @@ struct PlaybackQueueView: View {
         NavigationStack {
             Group {
                 if queue.items.isEmpty {
-                    EmptyPlaceholder(icon: "text.badge.plus", text: "??????")
+                    EmptyPlaceholder(icon: "text.badge.plus", text: "Playlist is empty")
                 } else {
                     List {
                         ForEach(queue.items) { video in
@@ -229,20 +229,20 @@ struct PlaybackQueueView: View {
                     }
                 }
             }
-            .navigationTitle("?????\(queue.items.count)?")
+            .navigationTitle("Playlist (\(queue.items.count))")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("??") { dismiss() }
+                    Button("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("????") {
+                        Button("Play all") {
                             let items = queue.items
                             dismiss()
                             onPlay(items)
                         }
                         .disabled(queue.items.isEmpty)
-                        Button("??", role: .destructive) { queue.clear() }
+                        Button("Clear", role: .destructive) { queue.clear() }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }

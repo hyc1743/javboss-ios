@@ -94,6 +94,26 @@ final class APIClient {
     func studioCoverUrl(id: Int64) -> String? { absoluteUrl("jav/studios/\(id)/cover") }
     func seriesCoverUrl(id: Int64) -> String? { absoluteUrl("jav/series/\(id)/cover") }
 
+    /// 把底层网络错误包装成带指引的友好提示（含本地网络权限引导）
+    static func friendlyNetworkError(_ error: Error) -> ApiError {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost:
+                return .network("无法连接服务器。请检查：\n1. 设置 → 隐私与安全性 → 本地网络 → 允许「JavBoss」\n2. 服务器地址与端口正确\n3. 电脑防火墙已放行")
+            case NSURLErrorTimedOut:
+                return .network("连接超时，请确认服务器地址与手机网络可达")
+            case NSURLErrorNotConnectedToInternet:
+                return .network("当前网络不可用")
+            case NSURLErrorSecureConnectionFailed:
+                return .network("安全连接失败（TLS 错误）")
+            default:
+                return .network(error.localizedDescription)
+            }
+        }
+        return .network(error.localizedDescription)
+    }
+
     // MARK: - 请求
 
     /// 构造带会话 Cookie 的请求（仅同源注入）
@@ -142,21 +162,48 @@ final class APIClient {
         return nil
     }
 
+    /// 响应体预览（截断），用于解码失败时的诊断提示
+    static func previewBody(_ data: Data?, limit: Int = 160) -> String {
+        guard let data = data, !data.isEmpty,
+              let text = String(data: data.prefix(limit), encoding: .utf8) else { return "（空响应）" }
+        let cleaned = text.replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if data.count > limit {
+            return cleaned + "…"
+        }
+        return cleaned
+    }
+
+    /// 解码失败时给出可诊断的错误（带原始响应预览与端口/地址提示）
+    static func decodeFailure(_ error: Error, data: Data?, endpoint: String) -> ApiError {
+        if let message = parseErrorBody(data) {
+            return ApiError.http(status: 200, message: "解析失败：\(message)")
+        }
+        let preview = previewBody(data)
+        let looksLikeHTML = preview.hasPrefix("<!DOCTYPE") || preview.hasPrefix("<html") || preview.hasPrefix("<")
+        if looksLikeHTML {
+            return ApiError.network("服务器返回了网页而非 API JSON。\n请确认填的是 JavBoss 服务端地址（默认端口 8080），且端口没有被其他服务占用。\n原始响应：\(preview)")
+        }
+        return ApiError.network("响应解析失败（\(endpoint)）：\(error.localizedDescription)\n原始响应：\(preview)")
+    }
+
     // MARK: - 泛型请求
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
         guard let url = apiUrl(path, query: query) else { throw ApiError.network("服务器地址无效") }
         var request = makeRequest(method: "GET", url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch {
+            throw Self.friendlyNetworkError(error)
+        }
         let body = try handleResponse(response, data: data)
         do {
             return try decoder.decode(T.self, from: body)
         } catch {
-            if let message = Self.parseErrorBody(body) {
-                throw ApiError.http(status: 200, message: "解析失败：\(message)")
-            }
-            throw ApiError.network("解析响应失败：\(error.localizedDescription)")
+            throw Self.decodeFailure(error, data: body, endpoint: path)
         }
     }
 
@@ -199,18 +246,23 @@ final class APIClient {
             data = try encoder.encode(body)
         }
         let request = makeRequest(method: method, url: url, body: data)
-        let (responseData, response) = try await urlSession.data(for: request)
+        let (responseData, response): (Data, URLResponse)
+        do {
+            (responseData, response) = try await urlSession.data(for: request)
+        } catch {
+            throw Self.friendlyNetworkError(error)
+        }
         let resultData = try handleResponse(response, data: responseData, allow401: path == "auth/login")
-        if T.self == EmptyResponse.self || resultData.isEmpty {
+        if T.self == EmptyResponse.self {
             return EmptyResponse() as! T
+        }
+        if resultData.isEmpty {
+            throw ApiError.network("服务器返回空响应（\(path)）")
         }
         do {
             return try decoder.decode(T.self, from: resultData)
         } catch {
-            if let message = Self.parseErrorBody(resultData) {
-                throw ApiError.http(status: 200, message: "解析失败：\(message)")
-            }
-            throw ApiError.network("解析响应失败：\(error.localizedDescription)")
+            throw Self.decodeFailure(error, data: resultData, endpoint: path)
         }
     }
 
@@ -221,7 +273,12 @@ final class APIClient {
     /// 带会话 Cookie 加载图片数据
     func imageData(url: URL) async throws -> Data {
         let request = makeRequest(method: "GET", url: url)
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch {
+            throw Self.friendlyNetworkError(error)
+        }
         let _ = try handleResponse(response, data: data)
         return data
     }

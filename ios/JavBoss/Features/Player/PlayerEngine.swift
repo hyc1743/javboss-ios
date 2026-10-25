@@ -220,6 +220,7 @@ final class AVPlayerEngine: ObservableObject {
     @Published var subtitlesEnabled = true
 
     var onError: (() -> Void)?
+    var onEnded: (() -> Void)?
 
     private var asset: AVURLAsset?
     private var loader: CookieResourceLoader?
@@ -230,6 +231,10 @@ final class AVPlayerEngine: ObservableObject {
         // 播放会话：后台静音时仍出声
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(handleEnded),
+                                               name: .AVPlayerItemDidPlayToEndTime,
+                                               object: nil)
 
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
@@ -254,6 +259,7 @@ final class AVPlayerEngine: ObservableObject {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         if let timeObserver {
             player.removeTimeObserver(timeObserver)
         }
@@ -344,5 +350,9 @@ final class AVPlayerEngine: ObservableObject {
         statusObserver = nil
         loader = nil
         asset = nil
+    }
+
+    @objc private func handleEnded() {
+        DispatchQueue.main.async { self.onEnded?() }
     }
 }

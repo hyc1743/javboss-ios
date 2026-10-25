@@ -282,4 +282,33 @@ final class APIClient {
         let _ = try handleResponse(response, data: data)
         return data
     }
+
+    /// Consume one server-sent-events connection. The caller owns reconnects.
+    func consumeSSE(_ path: String, query: [URLQueryItem] = [], onEvent: @escaping (Data) -> Void) async throws {
+        guard let url = apiUrl(path, query: query) else { throw ApiError.network("服务器地址无效") }
+        var request = makeRequest(method: "GET", url: url)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        let (bytes, response) = try await urlSession.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw ApiError.network("网络错误：无响应")
+        }
+        if http.statusCode == 401 { throw ApiError.authExpired }
+        guard (200..<300).contains(http.statusCode) else {
+            throw ApiError.http(status: http.statusCode, message: "请求失败（(http.statusCode)）")
+        }
+
+        var eventData = ""
+        for try await line in bytes.lines {
+            if line.isEmpty {
+                if let data = eventData.data(using: .utf8) {
+                    onEvent(data)
+                }
+                eventData = ""
+            } else if line.hasPrefix("data:") {
+                let value = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                eventData += eventData.isEmpty ? value : "\n\(value)"
+            }
+        }
+    }
 }

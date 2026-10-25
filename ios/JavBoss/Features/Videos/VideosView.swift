@@ -23,8 +23,12 @@ final class VideosViewModel: PagedListVM<Video> {
 
 struct VideosView: View {
     @StateObject private var vm = VideosViewModel()
+    @ObservedObject private var queue = PlaybackQueue.shared
     @State private var searchText = ""
     @State private var showFilter = false
+    @State private var showQueue = false
+    @State private var showPlayer = false
+    @State private var playerQueue: [Video] = []
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
@@ -53,6 +57,13 @@ struct VideosView: View {
                                     VideoCard(video: video)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button {
+                                        queue.add(video)
+                                    } label: {
+                                        Label("加入播放列表", systemImage: "text.badge.plus")
+                                    }
+                                }
                                 .task {
                                     await vm.loadMoreIfNeeded(current: video)
                                 }
@@ -81,6 +92,11 @@ struct VideosView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
+                        Button {
+                            showQueue = true
+                        } label: {
+                            Image(systemName: queue.items.isEmpty ? "text.badge.plus" : "text.badge.checkmark")
+                        }
                         Button {
                             vm.seed = Int64.random(in: 1...Int64.max)
                             Task { await vm.refresh() }
@@ -112,6 +128,21 @@ struct VideosView: View {
             .sheet(isPresented: $showFilter) {
                 VideoFilterSheet(vm: vm)
             }
+            .sheet(isPresented: $showQueue) {
+                PlaybackQueueView { items in
+                    playerQueue = items
+                    showQueue = false
+                    showPlayer = !items.isEmpty
+                }
+            }
+            .fullScreenCover(isPresented: $showPlayer) {
+                if let first = playerQueue.first {
+                    PlayerView(videoId: first.id,
+                               locationId: first.locationId,
+                               watchedMs: first.watchedMs,
+                               playlist: playerQueue)
+                }
+            }
             .task {
                 if vm.items.isEmpty {
                     await vm.refresh()
@@ -125,6 +156,7 @@ struct VideosView: View {
 
 struct VideoCard: View {
     let video: Video
+    @ObservedObject private var progress = WatchedProgressStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -142,7 +174,7 @@ struct VideoCard: View {
                     .padding(.vertical, 2)
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 4))
                     .padding(5)
-                if video.watchedMs > 0 {
+                if progress.watchedMs(videoId: video.id, fallback: video.watchedMs) > 0 {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .padding(5)
@@ -160,14 +192,64 @@ struct VideoCard: View {
             HStack(spacing: 8) {
                 Text(Fmt.bytes(video.size))
                 Text("▶ \(Fmt.count(Int64(video.playCount)))")
-                if video.watchedMs > 0 {
-                    Text("已看 \(Fmt.ms(video.watchedMs))")
+                let watchedMs = progress.watchedMs(videoId: video.id, fallback: video.watchedMs)
+                if watchedMs > 0 {
+                    Text("已看 \(Fmt.ms(watchedMs))")
                 }
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(1)
         }
+    }
+}
+
+struct PlaybackQueueView: View {
+    @ObservedObject private var queue = PlaybackQueue.shared
+    @Environment(\.dismiss) private var dismiss
+    let onPlay: ([Video]) -> Void
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if queue.items.isEmpty {
+                    EmptyPlaceholder(icon: "text.badge.plus", text: "??????")
+                } else {
+                    List {
+                        ForEach(queue.items) { video in
+                            HStack(spacing: 10) {
+                                RemoteImage(url: URL(string: AppState.shared.api.videoThumbnailUrl(videoId: video.id) ?? ""), contentMode: .fill)
+                                    .frame(width: 82, height: 46)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                Text(video.displayTitle).lineLimit(2)
+                                Spacer()
+                            }
+                        }
+                        .onDelete { queue.remove(at: $0) }
+                    }
+                }
+            }
+            .navigationTitle("?????\(queue.items.count)?")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("??") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("????") {
+                            let items = queue.items
+                            dismiss()
+                            onPlay(items)
+                        }
+                        .disabled(queue.items.isEmpty)
+                        Button("??", role: .destructive) { queue.clear() }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

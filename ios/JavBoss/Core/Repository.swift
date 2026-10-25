@@ -116,6 +116,28 @@ final class Repository {
         return try await api.get("videos/watched-time", query: query)
     }
 
+    func watchedTimeEventStream() -> AsyncStream<WatchedTimeSnapshot> {
+        AsyncStream { continuation in
+            let task = Task {
+                while !Task.isCancelled {
+                    do {
+                        try await api.consumeSSE("videos/watched-time/events") { data in
+                            if let snapshot = try? JSONDecoder().decode(WatchedTimeSnapshot.self, from: data) {
+                                continuation.yield(snapshot)
+                            }
+                        }
+                    } catch ApiError.authExpired {
+                        break
+                    } catch {
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     func createPlaybackSession(videoId: Int64, locationId: Int64 = 0) async throws -> String {
         let res: PlaybackSessionResponse = try await api.post("videos/\(videoId)/playback-sessions",
                                                                body: PlaybackSessionRequest(locationId: locationId))

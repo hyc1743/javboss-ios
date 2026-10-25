@@ -64,6 +64,7 @@ final class AppState: ObservableObject {
 
     @MainActor
     func logout() async {
+        WatchedProgressStore.shared.stop()
         try? await api.postVoid("auth/logout")
         session.clear()
         cookieJar.clear()
@@ -122,6 +123,9 @@ struct RootView: View {
         .task {
             if appState.loggedIn {
                 await appState.verifySession()
+                if appState.loggedIn {
+                    WatchedProgressStore.shared.start()
+                }
             }
         }
         .animation(.default, value: appState.loggedIn)

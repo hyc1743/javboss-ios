@@ -36,9 +36,9 @@ enum PanMode {
 
 @MainActor
 final class PlayerModel: ObservableObject {
-    let videoId: Int64
-    let locationId: Int64?
-    let initialWatchedMs: Int64
+    private(set) var videoId: Int64
+    private(set) var locationId: Int64?
+    private(set) var initialWatchedMs: Int64
 
     @Published var engine: AVPlayerEngine?
     @Published var loading = true
@@ -71,6 +71,7 @@ final class PlayerModel: ObservableObject {
     private var panStartLocation: CGPoint = .zero
 
     private let repo: Repository
+    var onEnded: (() -> Void)?
 
     init(videoId: Int64, locationId: Int64? = nil, initialWatchedMs: Int64) {
         self.videoId = videoId
@@ -96,6 +97,9 @@ final class PlayerModel: ObservableObject {
                         Task { @MainActor in
                             self?.tryNextSource()
                         }
+                    }
+                    newEngine.onEnded = { [weak self] in
+                        self?.onEnded?()
                     }
                     self.engine = newEngine
                     self.tryNextSource()
@@ -197,6 +201,23 @@ final class PlayerModel: ObservableObject {
 
     func flushProgress() {
         reportProgress()
+    }
+
+    func switchTo(video: Video) {
+        reportTask?.cancel()
+        engine?.stop()
+        videoId = video.id
+        locationId = video.locationId
+        initialWatchedMs = video.watchedMs
+        urls = []
+        urlIndex = 0
+        resumePositionMs = 0
+        lastReportedTotalMs = 0
+        sessionId = nil
+        loading = true
+        errorMessage = nil
+        showResumePrompt = false
+        load()
     }
 
     func setSensitivity(_ value: SeekSensitivity) {
@@ -484,15 +505,24 @@ struct PlayerView: View {
     let videoId: Int64
     let locationId: Int64?
     let watchedMs: Int64
+    let playlist: [Video]
 
     @StateObject private var model: PlayerModel
+    @State private var currentIndex = 0
     @Environment(\.dismiss) private var dismiss
 
-    init(videoId: Int64, locationId: Int64? = nil, watchedMs: Int64) {
+    init(videoId: Int64, locationId: Int64? = nil, watchedMs: Int64, playlist: [Video] = []) {
         self.videoId = videoId
         self.locationId = locationId
         self.watchedMs = watchedMs
+        self.playlist = playlist
         _model = StateObject(wrappedValue: PlayerModel(videoId: videoId, locationId: locationId, initialWatchedMs: watchedMs))
+    }
+
+    private func advancePlaylist() {
+        guard currentIndex + 1 < playlist.count else { return }
+        currentIndex += 1
+        model.switchTo(video: playlist[currentIndex])
     }
 
     var body: some View {
@@ -556,6 +586,7 @@ struct PlayerView: View {
         .onAppear {
             OrientationLock.shared.enterPlayer()
             UIApplication.shared.isIdleTimerDisabled = true
+            model.onEnded = { advancePlaylist() }
             model.load()
         }
         .onDisappear {

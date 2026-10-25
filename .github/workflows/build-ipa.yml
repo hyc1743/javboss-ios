@@ -49,7 +49,9 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/JavBoss.app Payload/
-          zip -r -y JavBoss-unsigned.ipa Payload
+          # Strip macOS extra file attributes for compatibility with older
+          # iOS importers based on SSZipArchive.
+          zip -r -X -y JavBoss-unsigned.ipa Payload
           ls -lh JavBoss-unsigned.ipa
 
       - name: Publish IPA as GitHub Release
@@ -148,7 +150,7 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/JavBoss.app Payload/
-          zip -r -y JavBoss-signed.ipa Payload
+          zip -r -X -y JavBoss-signed.ipa Payload
           ls -lh JavBoss-signed.ipa
 
       - name: Attach signed IPA to Release

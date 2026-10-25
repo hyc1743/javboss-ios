@@ -64,22 +64,37 @@ jobs:
     name: Build signed IPA (optional)
     runs-on: macos-15
     timeout-minutes: 60
-    if: ${{ secrets.IOS_P12_BASE64 != '' && secrets.IOS_MOBILEPROVISION_BASE64 != '' }}
+    env:
+      P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+      P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+      PROVISION_BASE64: ${{ secrets.IOS_MOBILEPROVISION_BASE64 }}
+      SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
+      DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
     steps:
+      - name: Check signing materials
+        id: check
+        run: |
+          if [ -n "$P12_BASE64" ] && [ -n "$PROVISION_BASE64" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.check.outputs.available == 'true'
         uses: actions/checkout@v4
 
       - name: Install XcodeGen
+        if: steps.check.outputs.available == 'true'
         run: brew install xcodegen
 
       - name: Generate Xcode project
+        if: steps.check.outputs.available == 'true'
         working-directory: ios
         run: xcodegen generate
 
       - name: Import signing certificate
-        env:
-          P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+        if: steps.check.outputs.available == 'true'
         run: |
           echo "$P12_BASE64" | base64 --decode > cert.p12
           security create-keychain -p ci build.keychain
@@ -89,19 +104,16 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
 
       - name: Install provisioning profile
-        env:
-          PROVISION_BASE64: ${{ secrets.IOS_MOBILEPROVISION_BASE64 }}
+        if: steps.check.outputs.available == 'true'
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$PROVISION_BASE64" | base64 --decode > profile.mobileprovision
-          UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
+          UUID=$(security cms -D -i profile.mobileprovision | /usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin)
           cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
       - name: Build signed
+        if: steps.check.outputs.available == 'true'
         working-directory: ios
-        env:
-          SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
-          DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
         run: |
           xcodebuild -project JavBoss.xcodeproj \
             -scheme JavBoss \
@@ -114,6 +126,7 @@ jobs:
             build
 
       - name: Package signed IPA
+        if: steps.check.outputs.available == 'true'
         working-directory: ios
         run: |
           mkdir -p Payload
@@ -122,8 +135,13 @@ jobs:
           ls -lh JavBoss-signed.ipa
 
       - name: Upload signed IPA artifact
+        if: steps.check.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: JavBoss-ipa-signed
           path: ios/JavBoss-signed.ipa
           if-no-files-found: error
+
+      - name: Skip (no signing secrets)
+        if: steps.check.outputs.available != 'true'
+        run: echo "未配置签名 Secrets，跳过签名构建"

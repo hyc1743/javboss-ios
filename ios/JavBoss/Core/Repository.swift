@@ -412,13 +412,13 @@ final class Repository {
         try await api.postVoid("tags/category", body: JavTagCategoryRequest(tagIds: tagIds, categoryId: categoryId))
     }
     func addVideoTags(videoIds: [Int64], tagId: Int64) async throws {
-        try await api.postVoid("videos/tags/add", body: ["video_ids": videoIds, "tag_id": tagId])
+        try await api.postVoid("videos/tags/add", body: VideoTagAssignRequest(videoIds: videoIds, tagId: tagId))
     }
     func removeVideoTags(videoIds: [Int64], tagId: Int64) async throws {
-        try await api.postVoid("videos/tags/remove", body: ["video_ids": videoIds, "tag_id": tagId])
+        try await api.postVoid("videos/tags/remove", body: VideoTagAssignRequest(videoIds: videoIds, tagId: tagId))
     }
     func replaceVideoTags(videoIds: [Int64], tagIds: [Int64]) async throws {
-        try await api.postVoid("videos/tags/replace", body: ["video_ids": videoIds, "tag_ids": tagIds])
+        try await api.postVoid("videos/tags/replace", body: VideoTagsReplaceRequest(videoIds: videoIds, tagIds: tagIds))
     }
 
     // MARK: 目录

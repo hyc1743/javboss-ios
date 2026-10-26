@@ -101,7 +101,7 @@ struct WorksListView: View {
                 EmptyPlaceholder(icon: "square.grid.2x2", text: "没有作品")
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 10) {
+                    WaterfallLayout(columns: 2, spacing: 10) {
                         ForEach(vm.items) { jav in
                             NavigationLink {
                                 WorkDetailView(javId: jav.id)

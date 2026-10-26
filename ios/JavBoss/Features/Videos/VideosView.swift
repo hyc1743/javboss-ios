@@ -49,7 +49,7 @@ struct VideosView: View {
                     EmptyPlaceholder(icon: "play.rectangle", text: "没有视频")
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 10) {
+                        WaterfallLayout(columns: 2, spacing: 10) {
                             ForEach(vm.items) { video in
                                 NavigationLink {
                                     VideoDetailView(videoId: video.id)

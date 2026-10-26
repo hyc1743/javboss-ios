@@ -139,6 +139,38 @@ class PagedListVM<T: Identifiable>: ObservableObject {
 
 // MARK: - 标签流式布局
 
+/// Masonry/waterfall layout that places each card into the shortest column.
+struct WaterfallLayout: Layout {
+    var columns = 2
+    var spacing: CGFloat = 10
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 0
+        guard width > 0, !subviews.isEmpty else { return CGSize(width: width, height: 0) }
+        let columnWidth = (width - CGFloat(max(0, columns - 1)) * spacing) / CGFloat(columns)
+        var heights = Array(repeating: CGFloat.zero, count: columns)
+        for subview in subviews {
+            let size = subview.sizeThatFits(.init(width: columnWidth, height: nil))
+            let index = heights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
+            heights[index] += size.height + spacing
+        }
+        return CGSize(width: width, height: max(0, (heights.max() ?? 0) - spacing))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard columns > 0, !subviews.isEmpty else { return }
+        let columnWidth = (bounds.width - CGFloat(columns - 1) * spacing) / CGFloat(columns)
+        var heights = Array(repeating: bounds.minY, count: columns)
+        for subview in subviews {
+            let index = heights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
+            let size = subview.sizeThatFits(.init(width: columnWidth, height: nil))
+            let x = bounds.minX + CGFloat(index) * (columnWidth + spacing)
+            subview.place(at: CGPoint(x: x, y: heights[index]), proposal: .init(width: columnWidth, height: size.height))
+            heights[index] += size.height + spacing
+        }
+    }
+}
+
 struct ChipFlowLayout: View {
     let chips: [String]
     var selected: Set<String> = []

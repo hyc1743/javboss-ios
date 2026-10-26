@@ -57,7 +57,7 @@ final class AVPlayerEngine: NSObject, ObservableObject, KSPlayerLayerDelegate {
         options.isAccurateSeek = true
         options.isSeekedAutoPlay = true
 
-        let newLayer = KSOptions.playerLayerType.init(url: url, options: options, delegate: self)
+        let newLayer = KSPlayerLayer(url: url, options: options, delegate: self)
         layer = newLayer
         if let playerView = newLayer.player.view {
             playerView.translatesAutoresizingMaskIntoConstraints = false

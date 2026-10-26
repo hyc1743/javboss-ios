@@ -71,7 +71,12 @@ final class FavoriteGroupsVM: ObservableObject {
         groups.move(fromOffsets: source, toOffset: destination)
         let ids = groups.map(\.id)
         Task {
-            try? await Repository(api: AppState.shared.api).reorderFavoriteGroups(entity, ids: ids)
+            do {
+                try await Repository(api: AppState.shared.api).reorderFavoriteGroups(entity, ids: ids)
+            } catch {
+                errorMessage = error.localizedDescription
+                await load()
+            }
         }
     }
 }
@@ -252,7 +257,12 @@ final class FavoriteGroupItemsVM: ObservableObject {
         items.move(fromOffsets: source, toOffset: destination)
         let ids = items.map(\.id)
         Task {
-            try? await Repository(api: AppState.shared.api).reorderFavoriteGroupItems(entity, id: group.id, entityIds: ids)
+            do {
+                try await Repository(api: AppState.shared.api).reorderFavoriteGroupItems(entity, id: group.id, entityIds: ids)
+            } catch {
+                errorMessage = error.localizedDescription
+                await load()
+            }
         }
     }
 }

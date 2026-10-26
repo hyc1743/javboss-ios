@@ -33,7 +33,6 @@ final class WatchedProgressStore: ObservableObject {
     func merge(_ snapshot: WatchedTimeSnapshot) {
         for item in snapshot.videos { videoTotals[item.id] = item.watchedMs }
         for item in snapshot.javs { javTotals[item.id] = item.watchedMs }
-        objectWillChange.send()
     }
 
     func watchedMs(videoId: Int64, fallback: Int64) -> Int64 {

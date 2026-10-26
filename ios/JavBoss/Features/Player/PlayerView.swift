@@ -62,7 +62,11 @@ final class PlayerModel: ObservableObject {
     private var resumePositionMs: Int64 = 0
     private var sessionId: String?
     private var lastReportedTotalMs: Int64 = 0
+    private var progressBaseMs: Int64 = 0
+    private var reportInFlight = false
     private var reportTask: Task<Void, Never>?
+    private var loadTask: Task<Void, Never>?
+    private var loadGeneration = UUID()
 
     // 手势状态
     private var panStartPositionMs: Int64 = 0
@@ -82,10 +86,16 @@ final class PlayerModel: ObservableObject {
     }
 
     func load() {
-        Task {
+        loadTask?.cancel()
+        let generation = UUID()
+        loadGeneration = generation
+        loadTask = Task { [weak self] in
+            guard let self else { return }
             do {
-                let resolved = try await repo.resolvePlayUrls(id: videoId, locationId: locationId)
+                let resolved = try await self.repo.resolvePlayUrls(id: self.videoId, locationId: self.locationId)
+                guard !Task.isCancelled else { return }
                 let ready = await MainActor.run {
+                    guard self.loadGeneration == generation else { return false }
                     self.urls = resolved
                     guard !self.urls.isEmpty else {
                         self.errorMessage = "没有可用的播放源"
@@ -110,16 +120,23 @@ final class PlayerModel: ObservableObject {
                     return true
                 }
                 guard ready else { return }
-                await repo.reportPlay(id: videoId)
-                await startSession()
-                startReportLoop()
+                await self.repo.reportPlay(id: self.videoId)
+                guard !Task.isCancelled, self.loadGeneration == generation else { return }
+                if self.initialWatchedMs <= 30_000 {
+                    self.resumePositionMs = 0
+                    self.progressBaseMs = self.initialWatchedMs
+                    self.lastReportedTotalMs = self.initialWatchedMs
+                    await self.beginPlaybackSession()
+                }
             } catch let error as ApiError {
                 await MainActor.run {
+                    guard self.loadGeneration == generation else { return }
                     self.errorMessage = error.localizedDescription
                     self.loading = false
                 }
             } catch {
                 await MainActor.run {
+                    guard self.loadGeneration == generation else { return }
                     self.errorMessage = error.localizedDescription
                     self.loading = false
                 }
@@ -152,18 +169,26 @@ final class PlayerModel: ObservableObject {
     func startFromBeginning() {
         showResumePrompt = false
         resumePositionMs = 0
+        progressBaseMs = initialWatchedMs
         lastReportedTotalMs = initialWatchedMs
-        Task { await startSession() }
+        Task { await beginPlaybackSession() }
     }
 
     func resumeFromPrevious() {
         showResumePrompt = false
         let start = min(initialWatchedMs, max(0, (engine?.durationMs ?? initialWatchedMs) - 5000))
         resumePositionMs = start
+        progressBaseMs = initialWatchedMs
         lastReportedTotalMs = start
         engine?.seek(to: start)
         engine?.play()
-        Task { await startSession() }
+        Task { await beginPlaybackSession() }
+    }
+
+    private func beginPlaybackSession() async {
+        sessionId = nil
+        await startSession()
+        if sessionId != nil { startReportLoop() }
     }
 
     private func startSession() async {
@@ -176,23 +201,33 @@ final class PlayerModel: ObservableObject {
 
     /// 每 10 秒上报累计观看时长；410 时重建会话
     func reportProgress() {
-        guard let engine, engine.isPlaying, let sessionId else { return }
+        guard let engine, let sessionId, !reportInFlight else { return }
         let position = engine.positionMs
-        guard position > resumePositionMs else { return }
-        let total = initialWatchedMs + (position - resumePositionMs)
+        guard let total = PlaybackProgress.total(
+            initialWatchedMs: progressBaseMs,
+            resumePositionMs: resumePositionMs,
+            positionMs: position
+        ) else { return }
         guard total > lastReportedTotalMs else { return }
-        lastReportedTotalMs = total
         let sid = sessionId
+        reportInFlight = true
         Task {
+            defer { reportInFlight = false }
             do {
                 try await repo.reportPlaybackSession(videoId: videoId, sessionId: sid, watchedMs: total)
+                await MainActor.run {
+                    if self.sessionId == sid {
+                        self.lastReportedTotalMs = max(self.lastReportedTotalMs, total)
+                    }
+                }
             } catch ApiError.http(let code, _) where code == 410 {
                 await MainActor.run {
                     self.sessionId = nil
+                    self.progressBaseMs = total
                     self.resumePositionMs = engine.positionMs
-                    self.lastReportedTotalMs = engine.positionMs
+                    self.lastReportedTotalMs = total
                 }
-                await startSession()
+                await beginPlaybackSession()
             } catch {
                 // 网络抖动忽略，下次再报
             }
@@ -215,7 +250,10 @@ final class PlayerModel: ObservableObject {
     }
 
     func switchTo(video: Video) {
+        flushProgress()
         reportTask?.cancel()
+        loadTask?.cancel()
+        loadGeneration = UUID()
         engine?.stop()
         videoId = video.id
         locationId = video.locationId
@@ -223,6 +261,7 @@ final class PlayerModel: ObservableObject {
         urls = []
         urlIndex = 0
         resumePositionMs = 0
+        progressBaseMs = video.watchedMs
         lastReportedTotalMs = 0
         sessionId = nil
         loading = true
@@ -335,9 +374,11 @@ final class PlayerModel: ObservableObject {
     }
 
     func teardown() {
+        flushProgress()
         reportTask?.cancel()
         reportTask = nil
-        flushProgress()
+        loadTask?.cancel()
+        loadTask = nil
         engine?.stop()
     }
 }

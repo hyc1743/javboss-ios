@@ -16,6 +16,14 @@ packages:
   KSPlayer:
     url: https://github.com/kingslay/KSPlayer.git
     exactVersion: 2.3.4
+schemes:
+  JavBoss:
+    build:
+      targets:
+        JavBoss: all
+    test:
+      targets:
+        - JavBossTests
 targets:
   JavBoss:
     type: application
@@ -45,5 +53,16 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: 用于连接局域网内的 JavBoss 服务端
+  JavBossTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: JavBossTests
+    dependencies:
+      - target: JavBoss
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.javboss.ios.tests
+        GENERATE_INFOPLIST_FILE: YES

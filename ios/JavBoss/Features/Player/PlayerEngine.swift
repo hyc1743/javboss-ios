@@ -140,10 +140,7 @@ final class AVPlayerEngine: NSObject, ObservableObject, KSPlayerLayerDelegate {
             isBuffering = false
             onEnded?()
         case .error:
-            failed = true
-            isPlaying = false
-            isBuffering = false
-            onError?()
+            failPlayback(for: layer)
         default:
             break
         }
@@ -156,11 +153,17 @@ final class AVPlayerEngine: NSObject, ObservableObject, KSPlayerLayerDelegate {
 
     func player(layer: KSPlayerLayer, finish error: Error?) {
         if let error {
-            failed = true
-            isPlaying = false
-            onError?()
+            failPlayback(for: layer)
             NSLog("KSPlayer playback failed: %@", error.localizedDescription)
         }
+    }
+
+    private func failPlayback(for layer: KSPlayerLayer) {
+        guard self.layer === layer, !failed else { return }
+        failed = true
+        isPlaying = false
+        isBuffering = false
+        onError?()
     }
 
     func player(layer: KSPlayerLayer, bufferedCount: Int, consumeTime: TimeInterval) {

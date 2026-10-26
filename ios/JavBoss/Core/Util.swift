@@ -88,18 +88,25 @@ class PagedListVM<T: Identifiable>: ObservableObject {
 
     var pageSize = 50
     private var isLoading = false
+    private var generation = 0
+    private var refreshRequested = false
 
     func clearError() { errorMessage = nil }
 
     func refresh() async {
-        await load(reset: true)
+        generation += 1
+        if isLoading {
+            refreshRequested = true
+            return
+        }
+        await load(reset: true, generation: generation)
     }
 
     func loadAll() async {
         if items.isEmpty { await load(reset: true) }
         while items.count < total {
             let before = items.count
-            await load(reset: false)
+            await load(reset: false, generation: generation)
             if items.count == before || errorMessage != nil { break }
         }
     }
@@ -108,7 +115,7 @@ class PagedListVM<T: Identifiable>: ObservableObject {
         guard let index = items.firstIndex(where: { $0.id == item.id }),
               index >= items.count - 8 else { return }
         if items.count < total || total == 0 {
-            await load(reset: false)
+            await load(reset: false, generation: generation)
         }
     }
 
@@ -118,8 +125,21 @@ class PagedListVM<T: Identifiable>: ObservableObject {
     }
 
     func load(reset: Bool) async {
-        if isLoading { return }
+        await load(reset: reset, generation: generation)
+    }
+
+    private func load(reset: Bool, generation requestedGeneration: Int) async {
+        if isLoading && !reset { return }
         isLoading = true
+        defer {
+            loading = false
+            loadingMore = false
+            isLoading = false
+            if refreshRequested {
+                refreshRequested = false
+                Task { await self.load(reset: true, generation: self.generation) }
+            }
+        }
         if reset {
             loading = true
         } else {
@@ -128,6 +148,9 @@ class PagedListVM<T: Identifiable>: ObservableObject {
         let offset = reset ? 0 : items.count
         do {
             let (page, total) = try await fetchPage(offset: offset)
+            guard !Task.isCancelled, requestedGeneration == generation else {
+                return
+            }
             if reset {
                 items = page
                 self.total = total
@@ -136,13 +159,12 @@ class PagedListVM<T: Identifiable>: ObservableObject {
                 self.total = total
             }
         } catch let error as ApiError {
+            guard requestedGeneration == generation else { return }
             errorMessage = error.localizedDescription
         } catch {
+            guard requestedGeneration == generation else { return }
             errorMessage = error.localizedDescription
         }
-        loading = false
-        loadingMore = false
-        isLoading = false
     }
 }
 

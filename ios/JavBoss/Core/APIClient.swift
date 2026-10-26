@@ -289,13 +289,20 @@ final class APIClient {
         var request = makeRequest(method: "GET", url: url)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        let (bytes, response) = try await urlSession.bytes(for: request)
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await urlSession.bytes(for: request)
+        } catch {
+            throw Self.friendlyNetworkError(error)
+        }
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.network("网络错误：无响应")
         }
+        cookieJar.storeCookies(from: http, for: url)
         if http.statusCode == 401 { throw ApiError.authExpired }
         guard (200..<300).contains(http.statusCode) else {
-            throw ApiError.http(status: http.statusCode, message: "请求失败（(http.statusCode)）")
+            throw ApiError.http(status: http.statusCode, message: "请求失败（\(http.statusCode)）")
         }
 
         var eventData = ""

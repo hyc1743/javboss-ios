@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
 
     /// 当前是否已登录（由 RootView 监听）
     @Published var loggedIn = false
+    @Published var connectionUnavailable = false
 
     private init() {
         session.restore()
@@ -46,6 +47,7 @@ final class AppState: ObservableObject {
         do {
             let status: AuthStatusResponse = try await api.get("auth/status")
             loggedIn = status.authenticated
+            connectionUnavailable = false
             if !status.authenticated {
                 session.clear()
                 cookieJar.clear()
@@ -58,6 +60,7 @@ final class AppState: ObservableObject {
                 loggedIn = false
             } else {
                 loggedIn = true
+                connectionUnavailable = true
             }
         }
     }
@@ -129,5 +132,15 @@ struct RootView: View {
             }
         }
         .animation(.default, value: appState.loggedIn)
+        .overlay(alignment: .top) {
+            if appState.connectionUnavailable {
+                Text("服务器暂时不可达，正在保留当前会话")
+                    .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.orange.opacity(0.9), in: Capsule())
+                    .padding(.top, 8)
+            }
+        }
     }
 }

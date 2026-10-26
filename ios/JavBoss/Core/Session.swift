@@ -3,6 +3,7 @@ import Foundation
 /// 会话持久化：服务器地址 + 登录 Cookie（对齐 Android 端语义）。
 final class Session: ObservableObject {
     private let defaults = UserDefaults.standard
+    private let keychain = KeychainStore()
     private let keyServerUrl = "session_server_url"
     private let keyCookie = "session_cookie_header"
 
@@ -17,7 +18,16 @@ final class Session: ObservableObject {
 
     func restore() {
         serverUrl = defaults.string(forKey: keyServerUrl) ?? ""
-        cookieHeader = defaults.string(forKey: keyCookie) ?? ""
+        if let cookie = keychain.string(forKey: keyCookie) {
+            cookieHeader = cookie
+        } else if let legacyCookie = defaults.string(forKey: keyCookie), !legacyCookie.isEmpty {
+            // One-time migration from the old UserDefaults storage.
+            cookieHeader = legacyCookie
+            keychain.set(legacyCookie, forKey: keyCookie)
+            defaults.removeObject(forKey: keyCookie)
+        } else {
+            cookieHeader = ""
+        }
     }
 
     /// 规范化：去掉末尾斜杠，无协议头时自动补 http://
@@ -37,7 +47,11 @@ final class Session: ObservableObject {
 
     func saveCookie(_ header: String) {
         cookieHeader = header
-        defaults.set(header, forKey: keyCookie)
+        if header.isEmpty {
+            keychain.remove(forKey: keyCookie)
+        } else {
+            keychain.set(header, forKey: keyCookie)
+        }
     }
 
     func clear() {
@@ -45,5 +59,6 @@ final class Session: ObservableObject {
         cookieHeader = ""
         defaults.removeObject(forKey: keyServerUrl)
         defaults.removeObject(forKey: keyCookie)
+        keychain.remove(forKey: keyCookie)
     }
 }

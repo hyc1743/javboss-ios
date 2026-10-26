@@ -4,12 +4,17 @@ final class ImageCache {
     static let shared = ImageCache()
     private let cache = NSCache<NSURL, NSData>()
 
+    private init() {
+        cache.countLimit = 400
+        cache.totalCostLimit = 64 * 1024 * 1024
+    }
+
     func data(for url: URL) -> Data? {
         cache.object(forKey: url as NSURL) as Data?
     }
 
     func set(_ data: Data, for url: URL) {
-        cache.setObject(data as NSData, forKey: url as NSURL)
+        cache.setObject(data as NSData, forKey: url as NSURL, cost: data.count)
     }
 }
 
@@ -53,6 +58,9 @@ struct RemoteImage: View {
     }
 
     private func load() async {
+        imageData = nil
+        failed = false
+        loading = false
         guard let url = url, !url.absoluteString.isEmpty else {
             failed = true
             return
@@ -71,6 +79,7 @@ struct RemoteImage: View {
                 failed = true
             }
         } catch {
+            if Task.isCancelled { return }
             failed = true
         }
         loading = false

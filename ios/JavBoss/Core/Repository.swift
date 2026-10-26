@@ -123,6 +123,7 @@ final class Repository {
     func watchedTimeEventStream() -> AsyncStream<WatchedTimeSnapshot> {
         AsyncStream { continuation in
             let task = Task {
+                var retryDelay: UInt64 = 1_000_000_000
                 while !Task.isCancelled {
                     do {
                         try await api.consumeSSE("videos/watched-time/events") { data in
@@ -130,10 +131,16 @@ final class Repository {
                                 continuation.yield(snapshot)
                             }
                         }
+                        retryDelay = min(retryDelay * 2, 30_000_000_000)
                     } catch ApiError.authExpired {
                         break
                     } catch {
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        do {
+                            try await Task.sleep(nanoseconds: retryDelay)
+                        } catch {
+                            break
+                        }
+                        retryDelay = min(retryDelay * 2, 30_000_000_000)
                     }
                 }
                 continuation.finish()

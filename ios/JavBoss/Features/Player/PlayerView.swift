@@ -484,18 +484,14 @@ final class PlayerLayerView: UIView {
 }
 
 struct VideoLayer: UIViewRepresentable {
-    let player: AVPlayer
+    let engine: AVPlayerEngine
 
-    func makeUIView(context: Context) -> PlayerLayerView {
-        let view = PlayerLayerView()
-        view.playerLayer.player = player
-        view.playerLayer.videoGravity = .resizeAspect
-        view.backgroundColor = .black
-        return view
+    func makeUIView(context: Context) -> UIView {
+        engine.videoView
     }
 
-    func updateUIView(_ uiView: PlayerLayerView, context: Context) {
-        uiView.playerLayer.player = player
+    func updateUIView(_ uiView: UIView, context: Context) {
+        uiView.backgroundColor = .black
     }
 }
 
@@ -530,7 +526,7 @@ struct PlayerView: View {
             Color.black.ignoresSafeArea()
 
             if let engine = model.engine {
-                VideoLayer(player: engine.player)
+                VideoLayer(engine: engine)
                     .ignoresSafeArea()
 
                 if !model.locked {

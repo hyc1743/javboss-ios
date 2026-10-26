@@ -12,12 +12,18 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+packages:
+  KSPlayer:
+    url: https://github.com/kingslay/KSPlayer.git
+    exactVersion: 2.3.4
 targets:
   JavBoss:
     type: application
     platform: iOS
     sources:
       - path: JavBoss
+    dependencies:
+      - package: KSPlayer
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.javboss.ios

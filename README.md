@@ -1,16 +1,15 @@
 # JavBoss iOS
 
-[JavBoss](https://github.com/Solr159/JavBoss) 的第三方 iOS 客户端（学习项目）。
-通过 JavBoss 自托管服务端的 REST API 获取数据，以原生 SwiftUI 呈现，
-云端（GitHub Actions）自动构建 IPA。
+[JavBoss](https://github.com/Solr159/JavBoss) 的 iOS 客户端实现。
+本项目参照上游 JavBoss 的服务端 API、Web 功能和播放协议，使用 SwiftUI
+实现移动端界面，并通过 GitHub Actions 自动构建 IPA。
 
-> 本仓库 fork 自 [zsdcxd/javboss-phone](https://github.com/zsdcxd/javboss-phone)
-> （Android 客户端，保留在 `android/` 目录作为参考实现）。
-> 本项目与 JavBoss 官方无关，仅调用其自托管服务端的 HTTP API。
+上游项目负责服务端、Web 客户端和 API；本仓库负责 iOS 客户端实现，
+不会修改上游服务端。`android/` 目录保留了 Android 客户端代码，作为移动端实现参考。
 
 ## 功能覆盖
 
-对照上游 JavBoss 服务端 API 完整适配（`internal/api` 全部核心路由）：
+参照上游 JavBoss 服务端 API 和 Web 客户端能力，覆盖主要移动端功能：
 
 | 模块 | 功能 |
 | --- | --- |
@@ -22,14 +21,13 @@
 | 下载 | 下载任务列表（进度/重试/取消/删除）、新建磁力任务、下载器设置（本地目录/并发/最小体积、CloudDrive2 配置与连接测试） |
 | 标签 | 作品标签 + 视频标签两套体系：增删改、分类 CRUD、批量归类、JavBus 分类导入 |
 | 更多 | 修改密码、扩展 API 令牌（增删/轮换/复制）、服务器状态（资源监控、FFmpeg 工具下载、数据源可用性检测、完整配置 JSON）、服务器 LAN 访问开关 |
-| 播放 | 全屏横屏 + 自绘控制条：播放/暂停、进度拖动、缓冲指示、字幕开关；direct 优先、HLS 转码兜底；单击显隐控制条、双击快进/快退 10s、长按 2x 加速、横滑调进度（灵敏度可调）、左竖滑亮度、右竖滑音量、锁定；观看时长上报（播放会话），续播提示 |
+| 播放 | 全屏横屏、KSPlayer/FFmpeg 解码、Cookie/HTTP Header 鉴权、direct/HLS 多源切换、播放失败回退、字幕和手势控制；播放列表连续播放、断点续播、观看时长上报和实时进度同步 |
 
-### 与安卓版 / 桌面的差异
+### 与上游 Web / Android 客户端的关系
 
-- 播放引擎为 AVPlayer（系统硬解，direct + HLS），Cookie 通过
-  `AVAssetResourceLoaderDelegate` 注入（对应安卓版 AuthProxy 本地代理方案）。
-  服务器转码 HLS 覆盖冷门封装（mkv/wmv 等），因此未引入 libVLC；
-  AVPlayer 无法直接解码的直链格式会自动走 HLS 转码流。
+- iOS 播放使用 KSPlayer 和 FFmpeg，沿用上游 `/videos/{id}/streams`、
+  `location_id`、direct/HLS 和 playback session 协议。
+- iOS、Android 和 Web 共享上游服务端数据和播放接口，界面与播放器实现根据各平台能力分别适配。
 - 桌面端专属功能（mpv 播放器热键、浏览器集成等）不属于移动客户端范畴，
   通过扩展 API 令牌模块与浏览器扩展联动。
 
@@ -66,8 +64,8 @@ open JavBoss.xcodeproj   # Xcode 中直接运行（需自选签名团队）
 ## 目录结构
 
 ```
-android/   上游 javboss-phone（Jetpack Compose 安卓客户端，参考实现）
-ios/       SwiftUI iOS 客户端（XcodeGen 工程）
+android/   Android 客户端代码（移动端参考实现）
+ios/       参照上游 JavBoss 实现的 SwiftUI iOS 客户端（XcodeGen 工程）
   JavBoss/
     App/        入口、会话根视图、屏幕方向控制
     Core/       会话/Cookie/API 客户端/模型/通用组件

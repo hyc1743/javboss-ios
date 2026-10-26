@@ -1011,7 +1011,7 @@ struct IdolMergeSheet: View {
                 }
             }
             .task {
-                items = (try? await Repository(api: AppState.shared.api).listIdols(limit: 200, offset: 0)).items.filter { $0.id != canonicalId }
+                items = ((try? await Repository(api: AppState.shared.api).listIdols(limit: 200, offset: 0))?.items ?? []).filter { $0.id != canonicalId }
             }
             .errorAlert(errorMessage) { errorMessage = nil }
         }
@@ -1052,7 +1052,7 @@ struct StudioMergeSheet: View {
                 }
             }
             .task {
-                items = (try? await Repository(api: AppState.shared.api).listStudios(limit: 200, offset: 0)).items.filter { $0.id != canonicalId }
+                items = ((try? await Repository(api: AppState.shared.api).listStudios(limit: 200, offset: 0))?.items ?? []).filter { $0.id != canonicalId }
             }
             .errorAlert(errorMessage) { errorMessage = nil }
         }

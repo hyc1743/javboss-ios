@@ -121,6 +121,7 @@ struct VideoScreenshotInfo: Decodable {
 struct ScreenshotListResponse: Decodable { let items: [VideoScreenshotInfo] }
 
 struct VideoCoverRequest: Encodable { let screenshotName: String }
+struct VideoScreenshotCreateRequest: Encodable { let second: Double }
 
 struct VideoJavScrapeSettingsRequest: Encodable { let mode: String; let code: String }
 struct VideoJavPossibleCodesResponse: Decodable {

@@ -163,6 +163,7 @@ struct WorksListView: View {
         }
         .task {
             if vm.items.isEmpty { await vm.refresh() }
+            await WatchedProgressStore.shared.refresh(javIds: vm.items.map(\.id))
         }
         .errorAlert(vm.errorMessage) { vm.clearError() }
     }
@@ -170,6 +171,7 @@ struct WorksListView: View {
 
 struct WorkCard: View {
     let jav: Jav
+    @ObservedObject private var progress = WatchedProgressStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -221,7 +223,8 @@ struct WorkCard: View {
                     if let duration = jav.durationMin, duration > 0 {
                         Text("\(duration)min")
                     }
-                    if let watched = jav.watchedMs, watched > 0 {
+                    let watched = progress.javTotals[jav.id] ?? jav.watchedMs ?? 0
+                    if watched > 0 {
                         Text("已看\(Fmt.ms(watched))")
                     }
                 }

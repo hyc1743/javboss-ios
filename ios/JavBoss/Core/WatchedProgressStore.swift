@@ -24,6 +24,12 @@ final class WatchedProgressStore: ObservableObject {
         task = nil
     }
 
+    func refresh(videoIds: [Int64] = [], javIds: [Int64] = []) async {
+        if let snapshot = try? await Repository(api: AppState.shared.api).watchedTime(videoIds: videoIds, javIds: javIds) {
+            merge(snapshot)
+        }
+    }
+
     func merge(_ snapshot: WatchedTimeSnapshot) {
         for item in snapshot.videos { videoTotals[item.id] = item.watchedMs }
         for item in snapshot.javs { javTotals[item.id] = item.watchedMs }

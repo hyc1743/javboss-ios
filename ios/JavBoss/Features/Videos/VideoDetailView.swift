@@ -52,6 +52,8 @@ struct VideoDetailView: View {
     @State private var showTagsEditor = false
     @State private var showJavScrape = false
     @State private var showLocationEditor = false
+    @State private var showScreenshotCapture = false
+    @State private var screenshotSecond = "0"
 
     init(videoId: Int64) {
         _vm = StateObject(wrappedValue: VideoDetailViewModel(videoId: videoId))
@@ -92,6 +94,20 @@ struct VideoDetailView: View {
             VideoLocationsView(videoId: vm.videoId) {
                 Task { await vm.load() }
             }
+        }
+        .alert("Create screenshot", isPresented: $showScreenshotCapture) {
+            TextField("Seconds", text: $screenshotSecond)
+                .keyboardType(.decimalPad)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let second = max(0, Double(screenshotSecond) ?? 0)
+                vm.perform("Creating screenshot") {
+                    _ = try await Repository(api: AppState.shared.api)
+                        .createScreenshot(videoId: vm.videoId, second: second)
+                }
+            }
+        } message: {
+            Text("Enter the position in seconds. The server needs FFmpeg or MPV.")
         }
         .overlay {
             if vm.busyAction != nil {
@@ -248,9 +264,12 @@ struct VideoDetailView: View {
                         Text("截图（\(vm.screenshots.count)）")
                             .font(.subheadline.bold())
                         Spacer()
-                        Text("截图由服务端扫描生成")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Button {
+                            screenshotSecond = "0"
+                            showScreenshotCapture = true
+                        } label: {
+                            Image(systemName: "camera.badge.plus")
+                        }
                     }
                     if vm.screenshots.isEmpty {
                         Text("暂无截图")

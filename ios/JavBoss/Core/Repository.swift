@@ -65,6 +65,10 @@ final class Repository {
         return res.items
     }
 
+    func createScreenshot(videoId: Int64, second: Double) async throws -> VideoScreenshotInfo {
+        try await api.post("videos/\(videoId)/screenshots", body: VideoScreenshotCreateRequest(second: second))
+    }
+
     func setVideoCover(videoId: Int64, screenshotName: String) async throws {
         try await api.putVoid("videos/\(videoId)/cover", body: VideoCoverRequest(screenshotName: screenshotName))
     }

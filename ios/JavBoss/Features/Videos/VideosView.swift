@@ -148,6 +148,7 @@ struct VideosView: View {
                     await vm.refresh()
                 }
                 await vm.loadTags()
+                await WatchedProgressStore.shared.refresh(videoIds: vm.items.map(\.id))
             }
             .errorAlert(vm.errorMessage) { vm.clearError() }
         }

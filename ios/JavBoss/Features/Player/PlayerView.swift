@@ -203,6 +203,17 @@ final class PlayerModel: ObservableObject {
         reportProgress()
     }
 
+    func captureScreenshot() {
+        let second = Double(engine?.positionMs ?? 0) / 1000.0
+        Task {
+            do {
+                _ = try await repo.createScreenshot(videoId: videoId, second: second)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     func switchTo(video: Video) {
         reportTask?.cancel()
         engine?.stop()
@@ -720,6 +731,13 @@ struct PlayerView: View {
                         }
                     }
                     Button {
+                        model.captureScreenshot()
+                    } label: {
+                        Image(systemName: "camera")
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                    }
+                    Button {
                         model.showSettings.toggle()
                     } label: {
                         Image(systemName: "gearshape")
@@ -727,7 +745,7 @@ struct PlayerView: View {
                             .foregroundStyle(.white)
                     }
                 }
-                Text("AVPlayer · 系统硬解 · direct 优先，HLS 转码兜底")
+                Text("KSPlayer ? FFmpeg ? direct/HLS")
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.5))
             }

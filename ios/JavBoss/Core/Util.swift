@@ -95,6 +95,15 @@ class PagedListVM<T: Identifiable>: ObservableObject {
         await load(reset: true)
     }
 
+    func loadAll() async {
+        if items.isEmpty { await load(reset: true) }
+        while items.count < total {
+            let before = items.count
+            await load(reset: false)
+            if items.count == before || errorMessage != nil { break }
+        }
+    }
+
     func loadMoreIfNeeded(current item: T) async {
         guard let index = items.firstIndex(where: { $0.id == item.id }),
               index >= items.count - 8 else { return }

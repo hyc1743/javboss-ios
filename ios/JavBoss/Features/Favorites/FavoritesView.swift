@@ -350,6 +350,17 @@ struct FavoriteGroupItemsView: View {
             } label: {
                 FavoriteItemRow(item: item, icon: "film")
             }
+            .contextMenu {
+                Button {
+                    Task {
+                        if let jav = try? await Repository(api: AppState.shared.api).getJavItem(id: item.id) {
+                            for video in jav.videos ?? [] { PlaybackQueue.shared.add(video) }
+                        }
+                    }
+                } label: {
+                    Label("Add videos to playlist", systemImage: "text.badge.plus")
+                }
+            }
         case .idol:
             NavigationLink {
                 IdolDetailView(idolId: item.id)

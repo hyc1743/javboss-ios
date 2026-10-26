@@ -160,6 +160,7 @@ struct WorksListView: View {
                         translating = true
                         Task {
                             do {
+                                await vm.loadAll()
                                 try await Repository(api: AppState.shared.api)
                                     .translateJavTitles(ids: vm.items.map(\.id))
                                 await vm.refresh()

@@ -56,6 +56,11 @@ final class JavTagsManageVM: ObservableObject {
         await load()
     }
 
+    func createScraped(name: String) async throws {
+        _ = try await Repository(api: AppState.shared.api).createJavScrapedTag(name: name)
+        await load()
+    }
+
     func rename(_ tag: JavTag, to name: String) async throws {
         try await Repository(api: AppState.shared.api).renameJavTag(id: tag.id, name: name)
         await load()
@@ -95,6 +100,7 @@ final class JavTagsManageVM: ObservableObject {
 struct JavTagsManageView: View {
     @StateObject private var vm = JavTagsManageVM()
     @State private var showCreate = false
+    @State private var showScrapedCreate = false
     @State private var renameTarget: JavTag?
     @State private var deleteTarget: JavTag?
     @State private var showRename = false
@@ -181,6 +187,11 @@ struct JavTagsManageView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    Menu {
+                        Button("New scraped tag") { showScrapedCreate = true }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
                 }
             }
         }
@@ -228,6 +239,23 @@ struct JavTagsManageView: View {
                     }
                 }
             } onCancel: { showRename = false }
+        }
+        .alert("New scraped tag", isPresented: $showScrapedCreate) {
+            TextField("Tag name", text: $newTagName)
+            Button("Cancel", role: .cancel) { newTagName = "" }
+            Button("Create") {
+                Task {
+                    do {
+                        try await vm.createScraped(name: newTagName)
+                        newTagName = ""
+                    } catch {
+                        vm.errorMessage = error.localizedDescription
+                    }
+                }
+            }
+            .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
+        } message: {
+            Text("Creates a tag with the upstream scraped-tag provider.")
         }
         .confirmDialog(
             title: "删除标签",

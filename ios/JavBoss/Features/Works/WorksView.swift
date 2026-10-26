@@ -82,6 +82,7 @@ struct WorksListView: View {
     @State private var searchText = ""
     @State private var showFilter = false
     @State private var viewMode = 0
+    @State private var translating = false
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
@@ -155,6 +156,22 @@ struct WorksListView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
+                    Button {
+                        translating = true
+                        Task {
+                            do {
+                                try await Repository(api: AppState.shared.api)
+                                    .translateJavTitles(ids: vm.items.map(\.id))
+                                await vm.refresh()
+                            } catch {
+                                vm.errorMessage = error.localizedDescription
+                            }
+                            translating = false
+                        }
+                    } label: {
+                        Image(systemName: translating ? "hourglass" : "character.bubble")
+                    }
+                    .disabled(translating || vm.items.isEmpty)
                 }
             }
         }

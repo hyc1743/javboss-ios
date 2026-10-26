@@ -189,6 +189,9 @@ final class Repository {
     func createJavTag(name: String) async throws -> JavTag {
         try await api.post("jav/tags", body: NameRequest(name: name))
     }
+    func createJavScrapedTag(name: String) async throws -> JavTag {
+        try await api.post("jav/tags/scraped", body: NameRequest(name: name))
+    }
     func renameJavTag(id: Int64, name: String) async throws {
         try await api.patchVoid("jav/tags/\(id)", body: NameRequest(name: name))
     }

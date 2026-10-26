@@ -34,6 +34,7 @@ struct IdolDetailView: View {
     @State private var showEdit = false
     @State private var showFavorite = false
     @State private var showCoverPicker = false
+    @State private var showMerge = false
     @State private var showWeb: WebTarget?
 
     init(idolId: Int64) {
@@ -72,6 +73,11 @@ struct IdolDetailView: View {
                     } label: {
                         Label("编辑信息", systemImage: "square.and.pencil")
                     }
+                    Button {
+                        showMerge = true
+                    } label: {
+                        Label("????", systemImage: "arrow.triangle.merge")
+                    }
                     Divider()
                     Button {
                         Task {
@@ -107,6 +113,9 @@ struct IdolDetailView: View {
         }
         .sheet(isPresented: $showCoverPicker) {
             IdolCoverPickerView(idolId: vm.idolId) { Task { await vm.load() } }
+        }
+        .sheet(isPresented: $showMerge) {
+            IdolMergeSheet(canonicalId: vm.idolId) { Task { await vm.load() } }
         }
         .sheet(item: $showWeb) { target in
             WebViewer(url: target.url)
@@ -465,6 +474,7 @@ struct StudioDetailView: View {
     @State private var showEdit = false
     @State private var showFavorite = false
     @State private var showWeb: WebTarget?
+    @State private var showMerge = false
 
     init(studioId: Int64) {
         _vm = StateObject(wrappedValue: StudioDetailVM(studioId: studioId))
@@ -491,6 +501,11 @@ struct StudioDetailView: View {
                         showFavorite = true
                     } label: {
                         Label("收藏夹", systemImage: "heart")
+                    }
+                    Button {
+                        showMerge = true
+                    } label: {
+                        Label("????", systemImage: "arrow.triangle.merge")
                     }
                     Button {
                         showEdit = true
@@ -524,6 +539,9 @@ struct StudioDetailView: View {
             FavoritePickerSheet(entity: .studio, itemId: vm.studioId, title: vm.studio?.name ?? "收藏夹") {
                 Task { await vm.load() }
             }
+        }
+        .sheet(isPresented: $showMerge) {
+            StudioMergeSheet(canonicalId: vm.studioId) { Task { await vm.load() } }
         }
         .sheet(item: $showWeb) { target in
             WebViewer(url: target.url)
@@ -952,6 +970,89 @@ struct SeriesEditView: View {
             .onAppear {
                 name = current?.name ?? ""
                 zhName = current?.zhName ?? ""
+            }
+            .errorAlert(errorMessage) { errorMessage = nil }
+        }
+    }
+}
+
+
+struct IdolMergeSheet: View {
+    let canonicalId: Int64
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var items: [JavIdolSummary] = []
+    @State private var selected: Set<Int64> = []
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            List(items) { item in
+                Toggle(isOn: Binding(get: { selected.contains(item.id) }, set: { value in
+                    if value { selected.insert(item.id) } else { selected.remove(item.id) }
+                })) {
+                    Text(item.displayName)
+                }
+            }
+            .navigationTitle("????")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("??") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("??") {
+                        Task {
+                            do {
+                                try await Repository(api: AppState.shared.api).mergeIdols(canonicalId: canonicalId, mergeIds: Array(selected))
+                                onDone()
+                                dismiss()
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                    .disabled(selected.isEmpty)
+                }
+            }
+            .task {
+                items = (try? await Repository(api: AppState.shared.api).listIdols(limit: 200, offset: 0)).items.filter { $0.id != canonicalId }
+            }
+            .errorAlert(errorMessage) { errorMessage = nil }
+        }
+    }
+}
+
+struct StudioMergeSheet: View {
+    let canonicalId: Int64
+    let onDone: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var items: [JavStudioSummary] = []
+    @State private var selected: Set<Int64> = []
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            List(items) { item in
+                Toggle(isOn: Binding(get: { selected.contains(item.id) }, set: { value in
+                    if value { selected.insert(item.id) } else { selected.remove(item.id) }
+                })) {
+                    Text(item.name)
+                }
+            }
+            .navigationTitle("????")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("??") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("??") {
+                        Task {
+                            do {
+                                try await Repository(api: AppState.shared.api).mergeStudios(canonicalId: canonicalId, mergeIds: Array(selected))
+                                onDone()
+                                dismiss()
+                            } catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                    .disabled(selected.isEmpty)
+                }
+            }
+            .task {
+                items = (try? await Repository(api: AppState.shared.api).listStudios(limit: 200, offset: 0)).items.filter { $0.id != canonicalId }
             }
             .errorAlert(errorMessage) { errorMessage = nil }
         }
